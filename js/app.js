@@ -84,25 +84,29 @@ function checkSavedSession() {
         return;
       }
 
+      // Only show resume modal if the user actually started the workout
+      // (clicked "Enter the Grounds" which starts the timer)
+      const timerWasStarted = state.session.timer.running || state.session.timer.elapsed > 0;
+      if (!timerWasStarted) {
+        // User never entered the workout, clear and start fresh
+        State.clearSession();
+        lastScreen = 'setup';
+        renderScreen('setup');
+        return;
+      }
+
       // Render setup first as background
       renderScreen('setup');
 
       // Show resume modal for in-progress workouts only
       Screens.renderResumeModal(
         app,
-        // On resume
+        // On resume - go directly to workout screen
         () => {
-          if (!State.allExercisesRolled() || !State.allRepsRolled()) {
-            lastScreen = 'roll';
-            State.setScreen('roll');
-          } else {
-            // Resume timer if it was running
-            if (state.session.timer.running) {
-              state.session.timer.lastTick = Date.now();
-            }
-            lastScreen = 'workout';
-            State.setScreen('workout');
-          }
+          // Resume timer from where it left off
+          State.resumeTimer();
+          lastScreen = 'workout';
+          State.setScreen('workout');
         },
         // On abandon
         () => {

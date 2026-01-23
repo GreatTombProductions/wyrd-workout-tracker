@@ -1,6 +1,14 @@
 // Wyrd Workout - State Management
 
-import { STORAGE_KEY, DEFAULT_SESSION_CONFIG, SUBCLASSES, PREFS_STORAGE_KEY } from './constants.js';
+import {
+  STORAGE_KEY,
+  DEFAULT_SESSION_CONFIG,
+  DEFAULT_ROUND_TEMPLATE,
+  SUBCLASSES,
+  PREFS_STORAGE_KEY,
+  getAvailableCategories,
+  getSubclassesForCategory
+} from './constants.js';
 
 // App state
 let currentScreen = 'setup'; // 'setup' | 'roll' | 'workout' | 'victory'
@@ -89,17 +97,91 @@ export function getExercise(subclass, category, index) {
   return exercises[safeIndex] || `${category} ${index}`;
 }
 
-// Create exercise slots from round template
-export function createSlots(config) {
-  const slots = [];
+// Template priority for accessibility classes (highest priority first)
+const TEMPLATE_PRIORITY = ['wheelchair', 'battleseer'];
 
-  for (const templateItem of config.roundTemplate) {
+// Get effective round template based on selected classes
+export function getEffectiveRoundTemplate(config) {
+  // Check for priority templates first (accessibility classes)
+  for (const priorityClass of TEMPLATE_PRIORITY) {
+    if (config.subclasses.includes(priorityClass)) {
+      const subclass = SUBCLASSES[priorityClass];
+      if (subclass && subclass.defaultTemplate) {
+        return subclass.defaultTemplate;
+      }
+    }
+  }
+
+  // If only one class selected, use its default template if available
+  if (config.subclasses.length === 1) {
+    const subclass = SUBCLASSES[config.subclasses[0]];
+    if (subclass && subclass.defaultTemplate) {
+      return subclass.defaultTemplate;
+    }
+  }
+
+  // For multiclass or classes without custom templates, use configured or default
+  return config.roundTemplate || DEFAULT_ROUND_TEMPLATE;
+}
+
+// Check if a category has identical exercise pools across all given subclasses
+// Returns true if all classes share the exact same exercises (same array reference or identical content)
+export function isCategorySharedPool(subclasses, category) {
+  if (subclasses.length <= 1) return false;
+
+  const validSubclasses = getSubclassesForCategory(subclasses, category);
+  if (validSubclasses.length <= 1) return false;
+
+  // Get the exercise arrays for each class
+  const exerciseArrays = validSubclasses.map(key => SUBCLASSES[key]?.exercises[category]);
+
+  // Check if any are undefined or empty
+  if (exerciseArrays.some(arr => !arr || arr.length === 0)) return false;
+
+  // Check if all arrays are the same reference (shared constant like SHARED_CORE_EXERCISES)
+  const firstArray = exerciseArrays[0];
+  if (exerciseArrays.every(arr => arr === firstArray)) {
+    return true;
+  }
+
+  // Check if all arrays have identical content (same exercises in same order)
+  const firstJson = JSON.stringify(firstArray);
+  return exerciseArrays.every(arr => JSON.stringify(arr) === firstJson);
+}
+
+// Determine subclass for a slot based on category and config
+// Returns: subclass key, or null if user needs to select
+function determineSubclassForCategory(config, category) {
+  if (!config.multiclass || config.subclasses.length <= 1) {
+    // Single class - use it
+    return config.subclasses[0];
+  }
+
+  // For multiclass, check if category is only available in one class
+  const validSubclasses = getSubclassesForCategory(config.subclasses, category);
+  if (validSubclasses.length === 1) {
+    // Auto-assign the only valid class
+    return validSubclasses[0];
+  }
+
+  // Check if this category uses a shared pool (identical exercises across classes)
+  if (isCategorySharedPool(config.subclasses, category)) {
+    // Randomly select a class - user can reroll if they want different "vibes"
+    return validSubclasses[Math.floor(Math.random() * validSubclasses.length)];
+  }
+
+  // Leave null for user to roll/select (classes have different exercises)
+  return null;
+}
+
+// Create exercise slots from round template
+export function createSlots(config, templateOverride = null) {
+  const slots = [];
+  const template = templateOverride || getEffectiveRoundTemplate(config);
+
+  for (const templateItem of template) {
     for (let i = 0; i < templateItem.count; i++) {
-      // If multiclass with multiple subclasses, leave null for user to roll/select
-      // Otherwise, use the single subclass
-      const subclass = (config.multiclass && config.subclasses.length > 1)
-        ? null
-        : config.subclasses[0];
+      const subclass = determineSubclassForCategory(config, templateItem.category);
 
       slots.push({
         category: templateItem.category,
@@ -121,7 +203,9 @@ export function rollSubclassForSlot(slotIndex, manualValue = null) {
   if (!session || !session.slots[slotIndex]) return;
 
   const slot = session.slots[slotIndex];
-  const availableSubclasses = session.config.subclasses;
+  // Only consider subclasses that have the slot's category available
+  const validSubclasses = getSubclassesForCategory(session.config.subclasses, slot.category);
+  const availableSubclasses = validSubclasses.length > 0 ? validSubclasses : session.config.subclasses;
 
   // Use manual value or roll randomly
   if (manualValue !== null && availableSubclasses.includes(manualValue)) {
@@ -149,7 +233,8 @@ export function initSession() {
       lastTick: null
     },
     baseRepRolls: {},
-    totalRepsCompleted: 0
+    totalRepsCompleted: 0,
+    exerciseHistory: []
   };
 
   saveSession();
@@ -242,16 +327,50 @@ export function stopTimer() {
   saveSession();
 }
 
-// Complete current exercise
-export function completeCurrentExercise() {
+// Pause the timer (user-initiated, preserves elapsed time)
+export function pauseTimer() {
+  if (!session || !session.timer.running) return;
+  session.timer.running = false;
+  session.timer.lastTick = null;
+  saveSession();
+}
+
+// Resume the timer from paused state
+export function resumeTimer() {
+  if (!session) return;
+  session.timer.running = true;
+  session.timer.lastTick = Date.now();
+  saveSession();
+}
+
+// Check if timer is paused (has elapsed time but not running)
+export function isTimerPaused() {
+  if (!session) return false;
+  return !session.timer.running && session.timer.elapsed > 0;
+}
+
+// Complete current exercise (with optional custom rep count for final exercise)
+export function completeCurrentExercise(customReps = null) {
   if (!session) return;
 
   const slot = session.slots[session.currentSlotIndex];
   if (!slot || slot.completed) return;
 
+  // Use custom reps if provided, otherwise use full reps
+  const repsCompleted = customReps !== null ? customReps : slot.actualReps;
+
   slot.completed = true;
-  session.hpRemaining -= slot.actualReps;
-  session.totalRepsCompleted += slot.actualReps;
+  session.hpRemaining -= repsCompleted;
+  session.totalRepsCompleted += repsCompleted;
+
+  // Record to exercise history
+  session.exerciseHistory.push({
+    round: session.currentRound,
+    category: slot.category,
+    subclass: slot.subclass,
+    exerciseName: slot.exerciseName,
+    reps: repsCompleted
+  });
 
   // Check for victory
   if (session.hpRemaining <= 0) {
@@ -279,6 +398,15 @@ export function completeRound() {
       slot.completed = true;
       session.hpRemaining -= slot.actualReps;
       session.totalRepsCompleted += slot.actualReps;
+
+      // Record to exercise history
+      session.exerciseHistory.push({
+        round: session.currentRound,
+        category: slot.category,
+        subclass: slot.subclass,
+        exerciseName: slot.exerciseName,
+        reps: slot.actualReps
+      });
     }
   }
 
@@ -409,6 +537,201 @@ export function getSessionStats() {
   return {
     totalTime: getFormattedTime(),
     totalRounds: session.currentRound,
-    totalReps: session.totalRepsCompleted
+    totalReps: session.totalRepsCompleted,
+    exerciseHistory: session.exerciseHistory || []
   };
+}
+
+// Check if completing current exercise would end the workout
+export function isFinalExercise() {
+  if (!session) return false;
+  const slot = session.slots[session.currentSlotIndex];
+  if (!slot) return false;
+  return session.hpRemaining - slot.actualReps <= 0;
+}
+
+// Get minimum reps needed to finish (for final exercise slider)
+export function getMinRepsToFinish() {
+  if (!session) return 1;
+  return Math.max(1, session.hpRemaining);
+}
+
+// Clear exercise for rerolling (no notify - caller handles re-render)
+export function clearExerciseForSlot(slotIndex) {
+  if (!session || !session.slots[slotIndex]) return;
+
+  const slot = session.slots[slotIndex];
+  slot.exerciseIndex = null;
+  slot.exerciseName = null;
+  slot.repRoll = null;
+  slot.actualReps = null;
+
+  // Also clear from baseRepRolls if in fixed mode
+  if (session.baseRepRolls[slotIndex] !== undefined) {
+    delete session.baseRepRolls[slotIndex];
+  }
+
+  saveSession();
+}
+
+// Clear subclass for rerolling (no notify - caller handles re-render)
+// Also clears exercise and reps since they depend on subclass
+export function clearSubclassForSlot(slotIndex) {
+  if (!session || !session.slots[slotIndex]) return;
+
+  const slot = session.slots[slotIndex];
+  slot.subclass = null;
+  slot.exerciseIndex = null;
+  slot.exerciseName = null;
+  slot.repRoll = null;
+  slot.actualReps = null;
+
+  // Also clear from baseRepRolls if in fixed mode
+  if (session.baseRepRolls[slotIndex] !== undefined) {
+    delete session.baseRepRolls[slotIndex];
+  }
+
+  saveSession();
+}
+
+// Clear reps for rerolling (no notify - caller handles re-render)
+// Keeps exercise intact
+export function clearRepsForSlot(slotIndex) {
+  if (!session || !session.slots[slotIndex]) return;
+
+  const slot = session.slots[slotIndex];
+  slot.repRoll = null;
+  slot.actualReps = null;
+
+  // Also clear from baseRepRolls if in fixed mode
+  if (session.baseRepRolls[slotIndex] !== undefined) {
+    delete session.baseRepRolls[slotIndex];
+  }
+
+  saveSession();
+}
+
+// Move a slot up or down (no notify - caller handles re-render)
+export function moveSlot(slotIndex, direction) {
+  if (!session) return false;
+
+  const newIndex = slotIndex + direction;
+  if (newIndex < 0 || newIndex >= session.slots.length) return false;
+
+  // Swap slots
+  const temp = session.slots[slotIndex];
+  session.slots[slotIndex] = session.slots[newIndex];
+  session.slots[newIndex] = temp;
+
+  // Also swap base rep rolls if they exist
+  const tempRepRoll = session.baseRepRolls[slotIndex];
+  const otherRepRoll = session.baseRepRolls[newIndex];
+
+  if (tempRepRoll !== undefined || otherRepRoll !== undefined) {
+    if (otherRepRoll !== undefined) {
+      session.baseRepRolls[slotIndex] = otherRepRoll;
+    } else {
+      delete session.baseRepRolls[slotIndex];
+    }
+    if (tempRepRoll !== undefined) {
+      session.baseRepRolls[newIndex] = tempRepRoll;
+    } else {
+      delete session.baseRepRolls[newIndex];
+    }
+  }
+
+  saveSession();
+  return true;
+}
+
+// Delete a slot (no notify - caller handles re-render)
+export function deleteSlot(slotIndex) {
+  if (!session || session.slots.length <= 1) return false;
+
+  session.slots.splice(slotIndex, 1);
+
+  // Rebuild baseRepRolls with updated indices
+  const newBaseRepRolls = {};
+  Object.keys(session.baseRepRolls).forEach(key => {
+    const idx = parseInt(key);
+    if (idx < slotIndex) {
+      newBaseRepRolls[idx] = session.baseRepRolls[idx];
+    } else if (idx > slotIndex) {
+      newBaseRepRolls[idx - 1] = session.baseRepRolls[idx];
+    }
+    // Skip the deleted index
+  });
+  session.baseRepRolls = newBaseRepRolls;
+
+  saveSession();
+  return true;
+}
+
+// Duplicate a slot (category only, no rolled values) - no notify - caller handles re-render
+export function duplicateSlot(slotIndex) {
+  if (!session || !session.slots[slotIndex]) return false;
+
+  const originalSlot = session.slots[slotIndex];
+  const subclass = determineSubclassForCategory(session.config, originalSlot.category);
+
+  const newSlot = {
+    category: originalSlot.category,
+    subclass,
+    exerciseIndex: null,
+    exerciseName: null,
+    repRoll: null,
+    actualReps: null,
+    completed: false
+  };
+
+  // Insert after the original slot
+  session.slots.splice(slotIndex + 1, 0, newSlot);
+
+  // Rebuild baseRepRolls with updated indices
+  const newBaseRepRolls = {};
+  Object.keys(session.baseRepRolls).forEach(key => {
+    const idx = parseInt(key);
+    if (idx <= slotIndex) {
+      newBaseRepRolls[idx] = session.baseRepRolls[idx];
+    } else {
+      newBaseRepRolls[idx + 1] = session.baseRepRolls[idx];
+    }
+  });
+  session.baseRepRolls = newBaseRepRolls;
+
+  saveSession();
+  return true;
+}
+
+// Add a new slot with a specific category (no notify - caller handles re-render)
+export function addSlot(category) {
+  if (!session) return false;
+
+  const subclass = determineSubclassForCategory(session.config, category);
+
+  const newSlot = {
+    category,
+    subclass,
+    exerciseIndex: null,
+    exerciseName: null,
+    repRoll: null,
+    actualReps: null,
+    completed: false
+  };
+
+  session.slots.push(newSlot);
+  saveSession();
+  return true;
+}
+
+// Get union of available categories across all selected subclasses
+export function getAvailableCategoriesForSession() {
+  if (!session) return [];
+
+  const allCategories = new Set();
+  session.config.subclasses.forEach(subclass => {
+    getAvailableCategories(subclass).forEach(cat => allCategories.add(cat));
+  });
+
+  return Array.from(allCategories);
 }

@@ -1,6 +1,25 @@
 // Wyrd Workout - Screen Rendering
 
-import { DIE_SIZES, SUBCLASSES, getRecommendedHP } from './constants.js';
+import { DIE_SIZES, SUBCLASSES, CATEGORIES, getRecommendedHP, getAvailableCategories, getSubclassesForCategory } from './constants.js';
+
+// Helper to generate exercise options for a select dropdown
+function getExerciseOptions(subclass, category, exerciseDie) {
+  const subclassData = SUBCLASSES[subclass];
+  if (!subclassData || !subclassData.exercises[category]) {
+    return [];
+  }
+  const exercises = subclassData.exercises[category];
+  const options = [];
+
+  // Only show options up to the number of available exercises (no duplicates)
+  const maxOptions = Math.min(exerciseDie, exercises.length);
+  for (let i = 1; i <= maxOptions; i++) {
+    const exerciseName = exercises[i - 1] || `${category} ${i}`;
+    options.push({ value: i, label: `${i}. ${exerciseName}` });
+  }
+
+  return options;
+}
 import * as State from './state.js';
 
 // Render the setup screen
@@ -10,7 +29,10 @@ export function renderSetupScreen(container) {
 
   container.innerHTML = `
     <div class="screen">
-      <h1>Wyrd Workout</h1>
+      <header class="title-header">
+        <h1>Wyrd of the World Tree</h1>
+        <h2 class="subtitle">Workout Tracker</h2>
+      </header>
 
       <div class="screen-content">
         <div class="form-group">
@@ -96,7 +118,7 @@ export function renderSetupScreen(container) {
         </div>
 
         <div class="form-group">
-          <label>HP Threshold</label>
+          <label>Encounter HP</label>
           <div class="hp-input-group">
             <input type="number"
                    id="hp-threshold"
@@ -289,7 +311,7 @@ function attachSetupListeners(container) {
         <h2>Custom Die</h2>
         <div class="modal-input-group">
           <label>D</label>
-          <input type="number" id="custom-die-input" min="2" max="100" value="${initialValue}" placeholder="?">
+          <input type="number" id="custom-die-input" min="1" max="100" value="${initialValue}" placeholder="?">
         </div>
         <div class="modal-buttons">
           <button class="btn btn--full" id="custom-die-confirm">Confirm</button>
@@ -306,7 +328,7 @@ function attachSetupListeners(container) {
 
     const confirm = () => {
       const value = parseInt(input.value);
-      if (value && value >= 2) {
+      if (value && value >= 1) {
         applyDieValue(type, value);
       }
       overlay.remove();
@@ -398,11 +420,16 @@ export function renderRollScreen(container) {
       </div>
 
       <div class="screen-footer">
-        <button class="btn btn--full btn--secondary"
+        <button class="btn btn--full btn--secondary mb-md"
                 id="enter-workout"
                 ${!canEnterWorkout(session, isNewRound) ? 'disabled' : ''}>
           Enter the Grounds
         </button>
+        ${!isNewRound ? `
+          <button class="btn btn--full btn--danger" id="back-to-setup">
+            Back to Setup
+          </button>
+        ` : ''}
       </div>
     </div>
   `;
@@ -410,51 +437,161 @@ export function renderRollScreen(container) {
   attachRollListeners(container, session, isNewRound);
 }
 
-function renderAllAtOnceMode(session, isNewRound) {
+// Render a single slot's HTML
+function renderSingleSlot(session, slot, index, isNewRound) {
   const isMulticlass = session.config.multiclass && session.config.subclasses.length > 1;
+  const canEdit = !isNewRound;
+  const hasSubclass = slot.subclass !== null;
+  const hasExercise = slot.exerciseIndex !== null;
+  const hasReps = slot.repRoll !== null;
+  const subclassName = hasSubclass ? (SUBCLASSES[slot.subclass]?.name || slot.subclass) : '???';
+  const categoryDisplay = slot.category;
+  const canRerollExercise = !isNewRound && hasExercise;
+  const canRerollClass = !isNewRound && isMulticlass && hasSubclass && !hasExercise;
+  const canRerollReps = !isNewRound && hasReps;
+  const canDelete = canEdit && session.slots.length > 1;
+  const isFirst = index === 0;
+  const isLast = index === session.slots.length - 1;
 
-  return session.slots.map((slot, index) => {
-    const hasSubclass = slot.subclass !== null;
-    const hasExercise = slot.exerciseIndex !== null;
-    const hasReps = slot.repRoll !== null;
-    const subclassName = hasSubclass ? (SUBCLASSES[slot.subclass]?.name || slot.subclass) : '???';
+  return `
+    <div class="roll-slot ${hasExercise && hasReps ? 'roll-slot--complete' : ''}" data-slot-index="${index}">
+      ${canEdit ? `
+        <div class="slot-controls-left">
+          <button class="slot-btn slot-btn--move" data-move-up="${index}" ${isFirst ? 'disabled' : ''} title="Move Up">▲</button>
+          <button class="slot-btn slot-btn--move" data-move-down="${index}" ${isLast ? 'disabled' : ''} title="Move Down">▼</button>
+        </div>
+      ` : ''}
+      <div class="roll-slot-info">
+        <div class="roll-slot-category" data-category="${slot.category}">${categoryDisplay}</div>
+        ${hasExercise ? `
+          <div class="roll-slot-result">
+            ${canRerollExercise ? `<button class="reroll-btn" data-reroll="${index}" title="Reroll Exercise">↻</button>` : ''}
+            ${slot.exerciseName}
+            ${hasReps ? `${canRerollReps ? `<button class="reroll-btn" data-reroll-reps="${index}" title="Reroll Reps">↻</button>` : ''}<strong>× ${slot.actualReps}</strong>` : ''}
+            <span class="text-muted">(${subclassName})</span>
+          </div>
+        ` : `<div class="roll-slot-result text-muted">${canRerollClass ? `<button class="reroll-btn" data-reroll-class="${index}" title="Reroll Class">↻</button>` : ''}${subclassName}</div>`}
+      </div>
+      <div class="roll-controls">
+        ${!isNewRound && isMulticlass && !hasSubclass ? (() => {
+          const validSubclasses = getSubclassesForCategory(session.config.subclasses, slot.category);
+          return `
+          <select class="roll-select" data-slot="${index}" data-type="subclass">
+            <option value="">Select...</option>
+            ${validSubclasses.map(key => `
+              <option value="${key}">${SUBCLASSES[key]?.name || key}</option>
+            `).join('')}
+          </select>
+          <button class="btn btn--small" data-roll-subclass="${index}">Roll<br>Class</button>
+        `;
+        })() : ''}
+        ${!isNewRound && hasSubclass && !hasExercise ? `
+          <select class="roll-select" data-slot="${index}" data-type="exercise">
+            <option value="">Select...</option>
+            ${getExerciseOptions(slot.subclass, slot.category, session.config.exerciseDie).map(opt => `
+              <option value="${opt.value}">${opt.label}</option>
+            `).join('')}
+          </select>
+          <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
+        ` : ''}
+        ${hasExercise && !hasReps ? `
+          <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
+                 min="1" max="${session.config.repDie}">
+          <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
+        ` : ''}
+      </div>
+      ${canEdit ? `
+        <div class="slot-controls-right">
+          <button class="slot-btn" data-duplicate="${index}" title="Duplicate">⧉</button>
+          <button class="slot-btn slot-btn--delete" data-delete="${index}" ${!canDelete ? 'disabled' : ''} title="Delete">×</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
 
-    return `
-      <div class="roll-slot ${hasExercise && hasReps ? 'roll-slot--complete' : ''}">
-        <div class="roll-slot-info">
-          <div class="roll-slot-category">${slot.category}</div>
-          ${hasExercise ? `
-            <div class="roll-slot-result">
-              ${slot.exerciseName}
-              ${hasReps ? `<strong>× ${slot.actualReps}</strong>` : ''}
-              <span class="text-muted">(${subclassName})</span>
-            </div>
-          ` : `<div class="roll-slot-result text-muted">${subclassName}</div>`}
-        </div>
-        <div class="roll-controls">
-          ${!isNewRound && isMulticlass && !hasSubclass ? `
-            <select class="roll-select" data-slot="${index}" data-type="subclass">
-              <option value="">Select...</option>
-              ${session.config.subclasses.map(key => `
-                <option value="${key}">${SUBCLASSES[key]?.name || key}</option>
-              `).join('')}
-            </select>
-            <button class="btn btn--small" data-roll-subclass="${index}">Roll<br>Class</button>
-          ` : ''}
-          ${!isNewRound && hasSubclass && !hasExercise ? `
-            <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
-                   min="1" max="${session.config.exerciseDie}" placeholder="1-${session.config.exerciseDie}">
-            <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
-          ` : ''}
-          ${hasExercise && !hasReps ? `
-            <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
-                   min="1" max="${session.config.repDie}" placeholder="1-${session.config.repDie}">
-            <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
-          ` : ''}
-        </div>
+function renderAllAtOnceMode(session, isNewRound) {
+  const canEdit = !isNewRound;
+
+  const slotsHtml = session.slots.map((slot, index) =>
+    renderSingleSlot(session, slot, index, isNewRound)
+  ).join('');
+
+  if (canEdit) {
+    return slotsHtml + `
+      <div class="slot-actions-container">
+        <button class="btn btn--small btn--secondary" id="add-exercise-card">+ Add Exercise</button>
+        <button class="btn btn--small" id="roll-all-btn">Roll All</button>
       </div>
     `;
-  }).join('');
+  }
+
+  return slotsHtml;
+}
+
+// Refresh all slot indices after structural changes (move/delete/duplicate/add)
+function refreshAllSlots(container, session, isNewRound) {
+  const slotsContainer = container.querySelector('.screen-content');
+  if (!slotsContainer) return;
+
+  // Get existing slot elements
+  const slotElements = slotsContainer.querySelectorAll('.roll-slot');
+
+  // Update each slot's HTML in place
+  session.slots.forEach((slot, index) => {
+    const newHtml = renderSingleSlot(session, slot, index, isNewRound);
+    const temp = document.createElement('div');
+    temp.innerHTML = newHtml;
+    const newSlotEl = temp.firstElementChild;
+
+    if (slotElements[index]) {
+      slotElements[index].replaceWith(newSlotEl);
+    } else {
+      // New slot (from duplicate/add) - insert before action buttons
+      const addContainer = slotsContainer.querySelector('.slot-actions-container');
+      if (addContainer) {
+        addContainer.insertAdjacentElement('beforebegin', newSlotEl);
+      } else {
+        slotsContainer.appendChild(newSlotEl);
+      }
+    }
+  });
+
+  // Remove extra slots if any were deleted
+  const updatedSlotElements = slotsContainer.querySelectorAll('.roll-slot');
+  for (let i = session.slots.length; i < updatedSlotElements.length; i++) {
+    updatedSlotElements[i].remove();
+  }
+
+  // Re-attach listeners to the updated slots
+  reattachSlotListeners(container, session, isNewRound);
+}
+
+// Re-attach all slot-related listeners after DOM updates
+function reattachSlotListeners(container, session, isNewRound) {
+  // Re-attach roll controls listeners
+  container.querySelectorAll('.roll-controls').forEach(controlsEl => {
+    attachSlotListeners(container, controlsEl, session, isNewRound);
+  });
+
+  // Re-attach reroll listeners
+  container.querySelectorAll('[data-reroll]').forEach(btn => {
+    attachRerollListener(container, btn, session, isNewRound);
+  });
+  container.querySelectorAll('[data-reroll-class]').forEach(btn => {
+    attachRerollClassListener(container, btn, session, isNewRound);
+  });
+  container.querySelectorAll('[data-reroll-reps]').forEach(btn => {
+    attachRerollRepsListener(container, btn, session, isNewRound);
+  });
+
+  // Re-attach manipulation listeners
+  if (!isNewRound) {
+    attachSlotManipulationListeners(container, session, isNewRound);
+  }
+
+  // Update enter button state
+  updateEnterButton(container, session, isNewRound);
 }
 
 function renderRevealMode(session) {
@@ -476,12 +613,13 @@ function renderRevealMode(session) {
     const isCurrent = index === currentIndex;
     const isHidden = index > currentIndex;
     const subclassName = SUBCLASSES[slot.subclass]?.name || slot.subclass;
+    const categoryDisplay = slot.category;
 
     if (isHidden) {
       return `
         <div class="roll-slot" style="opacity: 0.3">
           <div class="roll-slot-info">
-            <div class="roll-slot-category">${slot.category}</div>
+            <div class="roll-slot-category" data-category="${slot.category}">${slot.category}</div>
             <div class="roll-slot-result text-muted">???</div>
           </div>
         </div>
@@ -491,7 +629,7 @@ function renderRevealMode(session) {
     return `
       <div class="roll-slot ${isCurrent ? 'roll-slot--active' : ''} ${hasExercise && hasReps ? 'roll-slot--complete' : ''}">
         <div class="roll-slot-info">
-          <div class="roll-slot-category">${slot.category}</div>
+          <div class="roll-slot-category" data-category="${slot.category}">${categoryDisplay}</div>
           ${hasExercise ? `
             <div class="roll-slot-result">
               ${slot.exerciseName}
@@ -504,11 +642,11 @@ function renderRevealMode(session) {
           <div class="roll-controls">
             ${!hasExercise ? `
               <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
-                     min="1" max="${session.config.exerciseDie}" placeholder="1-${session.config.exerciseDie}">
+                     min="1" max="${session.config.exerciseDie}">
               <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
             ` : !hasReps ? `
               <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
-                     min="1" max="${session.config.repDie}" placeholder="1-${session.config.repDie}">
+                     min="1" max="${session.config.repDie}">
               <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll</button>
             ` : ''}
           </div>
@@ -539,25 +677,49 @@ function updateRollSlot(container, session, index, isNewRound) {
   const hasReps = slot.repRoll !== null;
   const subclassName = hasSubclass ? (SUBCLASSES[slot.subclass]?.name || slot.subclass) : '???';
   const isMulticlass = session.config.multiclass && session.config.subclasses.length > 1;
+  const canRerollExercise = !isNewRound && hasExercise;
+  const canRerollClass = !isNewRound && isMulticlass && hasSubclass && !hasExercise;
+  const canRerollReps = !isNewRound && hasReps;
 
   // Update complete state
   if (hasExercise && hasReps) {
     slotEl.classList.add('roll-slot--complete');
+  } else {
+    slotEl.classList.remove('roll-slot--complete');
   }
 
-  // Update result text
+  // Update result text (includes reroll button when applicable)
   const resultEl = slotEl.querySelector('.roll-slot-result');
   if (resultEl) {
     if (hasExercise) {
       resultEl.innerHTML = `
+        ${canRerollExercise ? `<button class="reroll-btn" data-reroll="${index}" title="Reroll Exercise">↻</button>` : ''}
         ${slot.exerciseName}
-        ${hasReps ? `<strong>× ${slot.actualReps}</strong>` : ''}
+        ${hasReps ? `${canRerollReps ? `<button class="reroll-btn" data-reroll-reps="${index}" title="Reroll Reps">↻</button>` : ''}<strong>× ${slot.actualReps}</strong>` : ''}
         <span class="text-muted">(${subclassName})</span>
       `;
       resultEl.classList.remove('text-muted');
+
+      // Attach reroll exercise listener if button exists
+      const rerollExerciseBtn = resultEl.querySelector('[data-reroll]');
+      if (rerollExerciseBtn) {
+        attachRerollListener(container, rerollExerciseBtn, session, isNewRound);
+      }
+
+      // Attach reroll reps listener if button exists
+      const rerollRepsBtn = resultEl.querySelector('[data-reroll-reps]');
+      if (rerollRepsBtn) {
+        attachRerollRepsListener(container, rerollRepsBtn, session, isNewRound);
+      }
     } else {
-      resultEl.textContent = subclassName;
+      resultEl.innerHTML = `${canRerollClass ? `<button class="reroll-btn" data-reroll-class="${index}" title="Reroll Class">↻</button>` : ''}${subclassName}`;
       resultEl.classList.add('text-muted');
+
+      // Attach reroll class listener if button exists
+      const rerollClassBtn = resultEl.querySelector('[data-reroll-class]');
+      if (rerollClassBtn) {
+        attachRerollClassListener(container, rerollClassBtn, session, isNewRound);
+      }
     }
   }
 
@@ -567,10 +729,12 @@ function updateRollSlot(container, session, index, isNewRound) {
     let newControls = '';
 
     if (!isNewRound && isMulticlass && !hasSubclass) {
+      // Only show classes that have this category available
+      const validSubclasses = getSubclassesForCategory(session.config.subclasses, slot.category);
       newControls = `
         <select class="roll-select" data-slot="${index}" data-type="subclass">
           <option value="">Select...</option>
-          ${session.config.subclasses.map(key => `
+          ${validSubclasses.map(key => `
             <option value="${key}">${SUBCLASSES[key]?.name || key}</option>
           `).join('')}
         </select>
@@ -578,14 +742,18 @@ function updateRollSlot(container, session, index, isNewRound) {
       `;
     } else if (!isNewRound && hasSubclass && !hasExercise) {
       newControls = `
-        <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
-               min="1" max="${session.config.exerciseDie}" placeholder="1-${session.config.exerciseDie}">
+        <select class="roll-select" data-slot="${index}" data-type="exercise">
+          <option value="">Select...</option>
+          ${getExerciseOptions(slot.subclass, slot.category, session.config.exerciseDie).map(opt => `
+            <option value="${opt.value}">${opt.label}</option>
+          `).join('')}
+        </select>
         <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
       `;
     } else if (hasExercise && !hasReps) {
       newControls = `
         <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
-               min="1" max="${session.config.repDie}" placeholder="1-${session.config.repDie}">
+               min="1" max="${session.config.repDie}">
         <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
       `;
     }
@@ -595,6 +763,36 @@ function updateRollSlot(container, session, index, isNewRound) {
     // Re-attach listeners for the new controls
     attachSlotListeners(container, controlsEl, session, isNewRound);
   }
+}
+
+// Attach reroll exercise button listener
+function attachRerollListener(container, btn, session, isNewRound) {
+  btn.addEventListener('click', () => {
+    const index = parseInt(btn.dataset.reroll);
+    State.clearExerciseForSlot(index);
+    updateRollSlot(container, State.getState().session, index, isNewRound);
+    updateEnterButton(container, State.getState().session, isNewRound);
+  });
+}
+
+// Attach reroll class button listener
+function attachRerollClassListener(container, btn, session, isNewRound) {
+  btn.addEventListener('click', () => {
+    const index = parseInt(btn.dataset.rerollClass);
+    State.clearSubclassForSlot(index);
+    updateRollSlot(container, State.getState().session, index, isNewRound);
+    updateEnterButton(container, State.getState().session, isNewRound);
+  });
+}
+
+// Attach reroll reps button listener
+function attachRerollRepsListener(container, btn, session, isNewRound) {
+  btn.addEventListener('click', () => {
+    const index = parseInt(btn.dataset.rerollReps);
+    State.clearRepsForSlot(index);
+    updateRollSlot(container, State.getState().session, index, isNewRound);
+    updateEnterButton(container, State.getState().session, isNewRound);
+  });
 }
 
 // Update the Enter button disabled state
@@ -641,13 +839,29 @@ function attachSlotListeners(container, controlsEl, session, isNewRound) {
     });
   }
 
+  // Exercise select
+  const exerciseSelect = controlsEl.querySelector('select[data-type="exercise"]');
+  if (exerciseSelect) {
+    exerciseSelect.addEventListener('change', () => {
+      if (exerciseSelect.value) {
+        const index = parseInt(exerciseSelect.dataset.slot);
+        State.rollExerciseForSlot(index, parseInt(exerciseSelect.value));
+
+        setTimeout(() => {
+          updateRollSlot(container, State.getState().session, index, isNewRound);
+          updateEnterButton(container, State.getState().session, isNewRound);
+        }, 100);
+      }
+    });
+  }
+
   // Roll exercise button
   const exerciseBtn = controlsEl.querySelector('[data-roll-exercise]');
   if (exerciseBtn) {
     exerciseBtn.addEventListener('click', () => {
       const index = parseInt(exerciseBtn.dataset.rollExercise);
-      const input = controlsEl.querySelector(`input[data-type="exercise"]`);
-      const manualValue = input && input.value ? parseInt(input.value) : null;
+      const select = controlsEl.querySelector(`select[data-type="exercise"]`);
+      const manualValue = select && select.value ? parseInt(select.value) : null;
 
       exerciseBtn.classList.add('dice-roll');
       State.rollExerciseForSlot(index, manualValue);
@@ -676,6 +890,20 @@ function attachSlotListeners(container, controlsEl, session, isNewRound) {
       }, 100);
     });
   }
+
+  // Reps input - change button text when user types
+  const repsInput = controlsEl.querySelector('input[data-type="reps"]');
+  if (repsInput && repsBtn) {
+    repsInput.addEventListener('input', () => {
+      if (repsInput.value) {
+        repsBtn.classList.add('btn--has-input');
+        repsBtn.innerHTML = 'Confirm<br>Input';
+      } else {
+        repsBtn.classList.remove('btn--has-input');
+        repsBtn.innerHTML = 'Roll<br>Reps';
+      }
+    });
+  }
 }
 
 function attachRollListeners(container, session, isNewRound) {
@@ -683,6 +911,26 @@ function attachRollListeners(container, session, isNewRound) {
   container.querySelectorAll('.roll-controls').forEach(controlsEl => {
     attachSlotListeners(container, controlsEl, session, isNewRound);
   });
+
+  // Attach reroll exercise button listeners
+  container.querySelectorAll('[data-reroll]').forEach(btn => {
+    attachRerollListener(container, btn, session, isNewRound);
+  });
+
+  // Attach reroll class button listeners
+  container.querySelectorAll('[data-reroll-class]').forEach(btn => {
+    attachRerollClassListener(container, btn, session, isNewRound);
+  });
+
+  // Attach reroll reps button listeners
+  container.querySelectorAll('[data-reroll-reps]').forEach(btn => {
+    attachRerollRepsListener(container, btn, session, isNewRound);
+  });
+
+  // Slot manipulation listeners (only on initial roll)
+  if (!isNewRound) {
+    attachSlotManipulationListeners(container, session, isNewRound);
+  }
 
   // Enter workout button
   const enterBtn = container.querySelector('#enter-workout');
@@ -692,6 +940,179 @@ function attachRollListeners(container, session, isNewRound) {
       State.setScreen('workout');
     });
   }
+
+  // Back to setup button
+  const backBtn = container.querySelector('#back-to-setup');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      State.clearSession();
+      State.setScreen('setup');
+    });
+  }
+}
+
+// Attach listeners for slot manipulation (move, delete, duplicate, add)
+function attachSlotManipulationListeners(container, session, isNewRound) {
+  // Move up buttons
+  container.querySelectorAll('[data-move-up]').forEach(btn => {
+    // Remove existing listeners by cloning
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.addEventListener('click', () => {
+      const index = parseInt(newBtn.dataset.moveUp);
+      if (State.moveSlot(index, -1)) {
+        refreshAllSlots(container, State.getState().session, isNewRound);
+      }
+    });
+  });
+
+  // Move down buttons
+  container.querySelectorAll('[data-move-down]').forEach(btn => {
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.addEventListener('click', () => {
+      const index = parseInt(newBtn.dataset.moveDown);
+      if (State.moveSlot(index, 1)) {
+        refreshAllSlots(container, State.getState().session, isNewRound);
+      }
+    });
+  });
+
+  // Delete buttons
+  container.querySelectorAll('[data-delete]').forEach(btn => {
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.addEventListener('click', () => {
+      const index = parseInt(newBtn.dataset.delete);
+      if (State.deleteSlot(index)) {
+        refreshAllSlots(container, State.getState().session, isNewRound);
+      }
+    });
+  });
+
+  // Duplicate buttons
+  container.querySelectorAll('[data-duplicate]').forEach(btn => {
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.addEventListener('click', () => {
+      const index = parseInt(newBtn.dataset.duplicate);
+      if (State.duplicateSlot(index)) {
+        refreshAllSlots(container, State.getState().session, isNewRound);
+      }
+    });
+  });
+
+  // Add exercise button
+  const addBtn = container.querySelector('#add-exercise-card');
+  if (addBtn) {
+    const newAddBtn = addBtn.cloneNode(true);
+    addBtn.parentNode.replaceChild(newAddBtn, addBtn);
+    newAddBtn.addEventListener('click', () => {
+      showAddExerciseModal(container, State.getState().session, isNewRound);
+    });
+  }
+
+  // Roll All button
+  const rollAllBtn = container.querySelector('#roll-all-btn');
+  if (rollAllBtn) {
+    const newRollAllBtn = rollAllBtn.cloneNode(true);
+    rollAllBtn.parentNode.replaceChild(newRollAllBtn, rollAllBtn);
+    newRollAllBtn.addEventListener('click', () => {
+      rollAllPending(container, isNewRound);
+    });
+  }
+}
+
+// Roll all pending slots sequentially with visual feedback
+function rollAllPending(container, isNewRound) {
+  const rollDelay = 280; // ~3.5 per second
+
+  // Collect all pending roll buttons in order
+  function collectPendingButtons() {
+    const buttons = [];
+    container.querySelectorAll('.roll-slot').forEach(slot => {
+      // Check for subclass roll button
+      const subclassBtn = slot.querySelector('[data-roll-subclass]');
+      if (subclassBtn) {
+        buttons.push(subclassBtn);
+        return; // Only one action per slot per pass
+      }
+      // Check for exercise roll button
+      const exerciseBtn = slot.querySelector('[data-roll-exercise]');
+      if (exerciseBtn) {
+        buttons.push(exerciseBtn);
+        return;
+      }
+      // Check for reps roll button
+      const repsBtn = slot.querySelector('[data-roll-reps]');
+      if (repsBtn) {
+        buttons.push(repsBtn);
+      }
+    });
+    return buttons;
+  }
+
+  function rollNext() {
+    const buttons = collectPendingButtons();
+    if (buttons.length === 0) return;
+
+    const btn = buttons[0];
+    btn.click();
+
+    // Schedule next roll after delay
+    setTimeout(rollNext, rollDelay);
+  }
+
+  rollNext();
+}
+
+// Show modal to select a category for adding a new exercise
+function showAddExerciseModal(container, session, isNewRound) {
+  const availableCategories = State.getAvailableCategoriesForSession();
+
+  // Create modal
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Add Exercise</h3>
+        <button class="modal-close" title="Close">×</button>
+      </div>
+      <div class="modal-content">
+        <p>Select a category:</p>
+        <div class="category-options">
+          ${availableCategories.map(cat =>
+            `<button class="btn btn--small btn--secondary category-btn" data-category="${cat}">${cat}</button>`
+          ).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Close button
+  modal.querySelector('.modal-close').addEventListener('click', () => {
+    modal.remove();
+  });
+
+  // Click outside to close
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.remove();
+    }
+  });
+
+  // Category buttons
+  modal.querySelectorAll('.category-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const category = btn.dataset.category;
+      State.addSlot(category);
+      modal.remove();
+      refreshAllSlots(container, State.getState().session, isNewRound);
+    });
+  });
 }
 
 // Render the workout screen
@@ -707,41 +1128,61 @@ export function renderWorkoutScreen(container) {
   const currentSlot = State.getCurrentSlot();
   const hpPercent = Math.max(0, (session.hpRemaining / session.config.hpThreshold) * 100);
   const remainingInRound = session.slots.length - session.currentSlotIndex;
+  const isFinal = State.isFinalExercise();
+  const minReps = State.getMinRepsToFinish();
+  const isPaused = State.isTimerPaused();
 
   container.innerHTML = `
     <div class="screen">
       <div class="workout-header">
-        <div class="timer">${State.getFormattedTime()}</div>
+        <div class="timer-row">
+          <div class="timer ${isPaused ? 'timer--paused' : ''}">${State.getFormattedTime()}</div>
+          <button class="btn btn--small btn--pause" id="pause-timer">
+            ${isPaused ? '&#9654;' : '&#10074;&#10074;'}
+          </button>
+        </div>
         <div class="round-indicator">Round ${session.currentRound}</div>
       </div>
 
-      <div class="hp-bar-container">
-        <div class="hp-bar">
-          <div class="hp-bar-fill" style="width: ${hpPercent}%"></div>
-          <div class="hp-bar-text">${session.hpRemaining} / ${session.config.hpThreshold}</div>
+      <div class="screen-content workout-content">
+        <div class="workout-center">
+          <div class="hp-bar-container">
+            <div class="hp-bar">
+              <div class="hp-bar-fill" style="width: ${hpPercent}%"></div>
+              <div class="hp-bar-text">${session.hpRemaining} / ${session.config.hpThreshold}</div>
+            </div>
+          </div>
+
+          ${currentSlot ? `
+            <div class="exercise-card">
+              <div class="exercise-category" data-category="${currentSlot.category}">${currentSlot.category}</div>
+              <div class="exercise-name">${currentSlot.exerciseName}</div>
+              <div class="exercise-reps" id="rep-display">${currentSlot.actualReps}</div>
+              <div class="exercise-reps-label">reps</div>
+              ${isFinal ? `
+                <div class="final-rep-slider">
+                  <input type="range" id="rep-slider"
+                         min="${minReps}" max="${currentSlot.actualReps}"
+                         value="${currentSlot.actualReps}">
+                  <div class="slider-labels">
+                    <span>${minReps} (min)</span>
+                    <span>${currentSlot.actualReps} (full)</span>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
         </div>
       </div>
 
-      <div class="screen-content">
+      <div class="screen-footer">
         <div class="round-progress">
           ${session.slots.map((slot, index) => `
             <div class="round-dot ${slot.completed ? 'round-dot--completed' : ''} ${index === session.currentSlotIndex ? 'round-dot--current' : ''}"></div>
           `).join('')}
         </div>
-
-        ${currentSlot ? `
-          <div class="exercise-card">
-            <div class="exercise-category">${currentSlot.category}</div>
-            <div class="exercise-name">${currentSlot.exerciseName}</div>
-            <div class="exercise-reps">${currentSlot.actualReps}</div>
-            <div class="exercise-reps-label">reps</div>
-          </div>
-        ` : ''}
-      </div>
-
-      <div class="screen-footer">
         <button class="btn btn--full btn--complete mb-md" id="complete-exercise">
-          Complete
+          ${isFinal ? 'Finish Workout' : 'Complete'}
         </button>
         <button class="btn btn--full btn--danger" id="complete-round">
           Complete Round (${remainingInRound} exercises)
@@ -750,14 +1191,44 @@ export function renderWorkoutScreen(container) {
     </div>
   `;
 
-  attachWorkoutListeners(container);
+  attachWorkoutListeners(container, isFinal);
 }
 
-function attachWorkoutListeners(container) {
+function attachWorkoutListeners(container, isFinal) {
+  // Pause/resume button
+  const pauseBtn = container.querySelector('#pause-timer');
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', () => {
+      const timerEl = container.querySelector('.timer');
+      if (State.isTimerPaused()) {
+        State.resumeTimer();
+        // Update UI without full re-render
+        if (timerEl) timerEl.classList.remove('timer--paused');
+        pauseBtn.innerHTML = '&#10074;&#10074;';
+      } else {
+        State.pauseTimer();
+        // Update UI without full re-render
+        if (timerEl) timerEl.classList.add('timer--paused');
+        pauseBtn.innerHTML = '&#9654;';
+      }
+    });
+  }
+
+  // Slider for final exercise
+  const slider = container.querySelector('#rep-slider');
+  const repDisplay = container.querySelector('#rep-display');
+  if (slider && repDisplay) {
+    slider.addEventListener('input', () => {
+      repDisplay.textContent = slider.value;
+    });
+  }
+
   const completeBtn = container.querySelector('#complete-exercise');
   if (completeBtn) {
     completeBtn.addEventListener('click', () => {
-      State.completeCurrentExercise();
+      // Use slider value if this is the final exercise
+      const customReps = isFinal && slider ? parseInt(slider.value) : null;
+      State.completeCurrentExercise(customReps);
       // Re-render if still on workout screen (victory transition handled by state)
       const state = State.getState();
       if (state.currentScreen === 'workout' && window.wyrdForceRender) {
@@ -788,26 +1259,55 @@ export function renderVictoryScreen(container) {
     return;
   }
 
+  // Group exercises by round
+  const exercisesByRound = {};
+  stats.exerciseHistory.forEach(ex => {
+    if (!exercisesByRound[ex.round]) {
+      exercisesByRound[ex.round] = [];
+    }
+    exercisesByRound[ex.round].push(ex);
+  });
+
   container.innerHTML = `
-    <div class="screen victory-screen">
+    <div class="screen">
       <h1 class="victory-title">The Encounter Ends</h1>
 
-      <div class="victory-stats">
-        <div class="victory-stat">
-          <div class="victory-stat-value">${stats.totalTime}</div>
-          <div class="victory-stat-label">Total Time</div>
+      <div class="screen-content">
+        <div class="victory-stats">
+          <div class="victory-stat">
+            <div class="victory-stat-value">${stats.totalTime}</div>
+            <div class="victory-stat-label">Time</div>
+          </div>
+          <div class="victory-stat">
+            <div class="victory-stat-value">${stats.totalRounds}</div>
+            <div class="victory-stat-label">Rounds</div>
+          </div>
+          <div class="victory-stat">
+            <div class="victory-stat-value">${stats.totalReps}</div>
+            <div class="victory-stat-label">Reps</div>
+          </div>
         </div>
-        <div class="victory-stat">
-          <div class="victory-stat-value">${stats.totalRounds}</div>
-          <div class="victory-stat-label">Rounds Completed</div>
-        </div>
-        <div class="victory-stat">
-          <div class="victory-stat-value">${stats.totalReps}</div>
-          <div class="victory-stat-label">Total Reps</div>
+
+        <div class="victory-history">
+          ${Object.entries(exercisesByRound).map(([round, exercises]) => `
+            <div class="victory-round">
+              <div class="victory-round-header">Round ${round}</div>
+              <div class="victory-exercises">
+                ${exercises.map(ex => `
+                  <div class="victory-exercise">
+                    <span class="victory-exercise-name">${ex.exerciseName}</span>
+                    <span class="victory-exercise-reps">× ${ex.reps}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `).join('')}
         </div>
       </div>
 
-      <button class="btn btn--full" id="new-workout">New Workout</button>
+      <div class="screen-footer">
+        <button class="btn btn--full" id="new-workout">New Workout</button>
+      </div>
     </div>
   `;
 

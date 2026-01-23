@@ -83,15 +83,6 @@ const SHARED_CORE_EXERCISES = [
   'Bodyweight Hanging Leg Raise'
 ];
 
-// Generate placeholder exercises for a category
-function generatePlaceholderExercises(category, count = 20) {
-  const exercises = [];
-  for (let i = 1; i <= count; i++) {
-    exercises.push(`${category} ${i}`);
-  }
-  return exercises;
-}
-
 // Subclass definitions
 export const SUBCLASSES = {
   ranger: {
@@ -154,8 +145,7 @@ export const SUBCLASSES = {
         'Bodyweight Forward Lunge With Knee Strike',
         'Bodyweight Alternating Lunge Jumps'
       ],
-      Core: SHARED_CORE_EXERCISES,
-      Cardio: generatePlaceholderExercises('Bodyweight Cardio')
+      Core: SHARED_CORE_EXERCISES
     }
   },
   barbarian: {
@@ -231,8 +221,7 @@ export const SUBCLASSES = {
         'Hammer Reverse Lunge w/ Vertical Strike',
         'Hammer Forward Lunge w/ Vertical Strike'
       ],
-      Core: SHARED_CORE_EXERCISES,
-      Cardio: generatePlaceholderExercises('Hammer Cardio')
+      Core: SHARED_CORE_EXERCISES
     }
   },
   fighter: {
@@ -291,8 +280,7 @@ export const SUBCLASSES = {
         'Single Dumbbell Reverse Lunge w/ Knee Strike',
         'Single Dumbbell Forward Lunge w/ Knee Strike'
       ],
-      Core: SHARED_CORE_EXERCISES,
-      Cardio: generatePlaceholderExercises('Dumbbell Cardio')
+      Core: SHARED_CORE_EXERCISES
     }
   },
   grappler: {
@@ -357,8 +345,7 @@ export const SUBCLASSES = {
         'Sandbag Bearhug Forward Lunge',
         'Sandbag Bearhug Reverse Lunge'
       ],
-      Core: SHARED_CORE_EXERCISES,
-      Cardio: generatePlaceholderExercises('Sandbag Cardio')
+      Core: SHARED_CORE_EXERCISES
     }
   },
   guardian: {
@@ -415,8 +402,7 @@ export const SUBCLASSES = {
         'Shield Slam Reverse Lunge',
         'Shield Slam Forward Lunge'
       ],
-      Core: SHARED_CORE_EXERCISES,
-      Cardio: generatePlaceholderExercises('Shield Cardio')
+      Core: SHARED_CORE_EXERCISES
     }
   },
   berserker: {
@@ -467,21 +453,14 @@ export const SUBCLASSES = {
       ]
     }
   },
-  archer: {
-    name: 'Archer',
-    equipment: 'Resistance Band',
-    exercises: {
-      Push: generatePlaceholderExercises('Band Push'),
-      Pull: generatePlaceholderExercises('Band Pull'),
-      'Squat/Hinge': generatePlaceholderExercises('Band Squat'),
-      Lunge: generatePlaceholderExercises('Band Lunge'),
-      Core: generatePlaceholderExercises('Band Core'),
-      Cardio: generatePlaceholderExercises('Band Cardio')
-    }
-  },
   wheelchair: {
     name: 'Combat Wheelchair',
     equipment: 'DB/Band/Weapon',
+    defaultTemplate: [
+      { category: 'Push', count: 2 },
+      { category: 'Pull', count: 2 },
+      { category: 'Cardio', count: 1 }
+    ],
     exercises: {
       Push: [
         'Seated Dumbbell Overhead Tricep Extension',
@@ -531,17 +510,14 @@ export const SUBCLASSES = {
   battleseer: {
     name: 'Battleseer',
     equipment: 'Staff',
-    // Note: Battleseer uses different category names
-    categoryMapping: {
-      'Push': 'Upper Body',
-      'Pull': null,  // No separate Pull - merged into Upper Body
-      'Squat/Hinge': 'Lower Body',
-      'Lunge': null,  // No separate Lunge - merged into Lower Body
-      'Core': 'Core (Optional)',
-      'Cardio': 'Cardio'
-    },
+    defaultTemplate: [
+      { category: 'Upper Body', count: 2 },
+      { category: 'Lower Body', count: 2 },
+      { category: 'Cardio', count: 1 },
+      { category: 'Core', count: 1 }
+    ],
     exercises: {
-      Push: [  // Actually "Upper Body"
+      'Upper Body': [
         'Staff Side Thrust',
         'Staff Alternating Diagonal Downward Strike',
         'Staff Alternating Side Thrust',
@@ -563,8 +539,7 @@ export const SUBCLASSES = {
         'Staff Underhand Front Raise',
         'Staff Front Raise'
       ],
-      Pull: [],  // No separate Pull for Battleseer
-      'Squat/Hinge': [  // Actually "Lower Body"
+      'Lower Body': [
         'Staff Ready Forward Step',
         'Staff Ready Back Step',
         'Staff Ready Side Step',
@@ -578,7 +553,6 @@ export const SUBCLASSES = {
         'Staff Assisted Squat Hold',
         'Staff Assisted Lunge Hold'
       ],
-      Lunge: [],  // No separate Lunge for Battleseer
       Core: SHARED_CORE_EXERCISES,
       Cardio: [
         'Staff Assisted March',
@@ -589,6 +563,22 @@ export const SUBCLASSES = {
     }
   }
 };
+
+// Get available categories for a subclass (categories that have exercises)
+export function getAvailableCategories(subclass) {
+  const sub = SUBCLASSES[subclass];
+  if (!sub) return CATEGORIES;
+
+  // Return all category keys that have exercises
+  return Object.keys(sub.exercises).filter(cat =>
+    sub.exercises[cat] && sub.exercises[cat].length > 0
+  );
+}
+
+// Get subclasses that have a given category available
+export function getSubclassesForCategory(subclasses, category) {
+  return subclasses.filter(key => getAvailableCategories(key).includes(category));
+}
 
 export const DEFAULT_ROUND_TEMPLATE = [
   { category: 'Push', count: 1 },
