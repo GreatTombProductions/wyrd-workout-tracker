@@ -453,6 +453,11 @@ function renderSingleSlot(session, slot, index, isNewRound) {
   const isFirst = index === 0;
   const isLast = index === session.slots.length - 1;
 
+  // Determine if we need controls (select/input + button)
+  const hasControls = (!isNewRound && isMulticlass && !hasSubclass) ||
+                      (!isNewRound && hasSubclass && !hasExercise) ||
+                      (hasExercise && !hasReps);
+
   return `
     <div class="roll-slot ${hasExercise && hasReps ? 'roll-slot--complete' : ''}" data-slot-index="${index}">
       ${canEdit ? `
@@ -461,43 +466,47 @@ function renderSingleSlot(session, slot, index, isNewRound) {
           <button class="slot-btn slot-btn--move" data-move-down="${index}" ${isLast ? 'disabled' : ''} title="Move Down">▼</button>
         </div>
       ` : ''}
-      <div class="roll-slot-info">
-        <div class="roll-slot-category" data-category="${slot.category}">${categoryDisplay}</div>
-        ${hasExercise ? `
-          <div class="roll-slot-result">
-            ${canRerollExercise ? `<button class="reroll-btn" data-reroll="${index}" title="Reroll Exercise">↻</button>` : ''}
-            ${slot.exerciseName}
-            ${hasReps ? `${canRerollReps ? `<button class="reroll-btn" data-reroll-reps="${index}" title="Reroll Reps">↻</button>` : ''}<strong>× ${slot.actualReps}</strong>` : ''}
-            <span class="text-muted">(${subclassName})</span>
+      <div class="roll-slot-main">
+        <div class="roll-slot-header">
+          <span class="roll-slot-category" data-category="${slot.category}">${categoryDisplay}</span>
+          ${hasExercise ? `
+            <span class="roll-slot-result">
+              ${canRerollExercise ? `<button class="reroll-btn" data-reroll="${index}" title="Reroll Exercise">↻</button>` : ''}
+              ${slot.exerciseName}
+              ${hasReps ? `${canRerollReps ? `<button class="reroll-btn" data-reroll-reps="${index}" title="Reroll Reps">↻</button>` : ''}<strong>× ${slot.actualReps}</strong>` : ''}
+              <span class="text-muted">(${subclassName})</span>
+            </span>
+          ` : `<span class="roll-slot-subclass text-muted">${canRerollClass ? `<button class="reroll-btn" data-reroll-class="${index}" title="Reroll Class">↻</button>` : ''}${subclassName}</span>`}
+        </div>
+        ${hasControls ? `
+          <div class="roll-controls">
+            ${!isNewRound && isMulticlass && !hasSubclass ? (() => {
+              const validSubclasses = getSubclassesForCategory(session.config.subclasses, slot.category);
+              return `
+              <select class="roll-select" data-slot="${index}" data-type="subclass">
+                <option value="">Select...</option>
+                ${validSubclasses.map(key => `
+                  <option value="${key}">${SUBCLASSES[key]?.name || key}</option>
+                `).join('')}
+              </select>
+              <button class="btn btn--small" data-roll-subclass="${index}">Roll<br>Class</button>
+            `;
+            })() : ''}
+            ${!isNewRound && hasSubclass && !hasExercise ? `
+              <select class="roll-select" data-slot="${index}" data-type="exercise">
+                <option value="">Select...</option>
+                ${getExerciseOptions(slot.subclass, slot.category, session.config.exerciseDie).map(opt => `
+                  <option value="${opt.value}">${opt.label}</option>
+                `).join('')}
+              </select>
+              <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
+            ` : ''}
+            ${hasExercise && !hasReps ? `
+              <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
+                     min="1" max="${session.config.repDie}">
+              <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
+            ` : ''}
           </div>
-        ` : `<div class="roll-slot-result text-muted">${canRerollClass ? `<button class="reroll-btn" data-reroll-class="${index}" title="Reroll Class">↻</button>` : ''}${subclassName}</div>`}
-      </div>
-      <div class="roll-controls">
-        ${!isNewRound && isMulticlass && !hasSubclass ? (() => {
-          const validSubclasses = getSubclassesForCategory(session.config.subclasses, slot.category);
-          return `
-          <select class="roll-select" data-slot="${index}" data-type="subclass">
-            <option value="">Select...</option>
-            ${validSubclasses.map(key => `
-              <option value="${key}">${SUBCLASSES[key]?.name || key}</option>
-            `).join('')}
-          </select>
-          <button class="btn btn--small" data-roll-subclass="${index}">Roll<br>Class</button>
-        `;
-        })() : ''}
-        ${!isNewRound && hasSubclass && !hasExercise ? `
-          <select class="roll-select" data-slot="${index}" data-type="exercise">
-            <option value="">Select...</option>
-            ${getExerciseOptions(slot.subclass, slot.category, session.config.exerciseDie).map(opt => `
-              <option value="${opt.value}">${opt.label}</option>
-            `).join('')}
-          </select>
-          <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
-        ` : ''}
-        ${hasExercise && !hasReps ? `
-          <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
-                 min="1" max="${session.config.repDie}">
-          <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
         ` : ''}
       </div>
       ${canEdit ? `
@@ -614,13 +623,16 @@ function renderRevealMode(session) {
     const isHidden = index > currentIndex;
     const subclassName = SUBCLASSES[slot.subclass]?.name || slot.subclass;
     const categoryDisplay = slot.category;
+    const hasControls = isCurrent && (!hasExercise || !hasReps);
 
     if (isHidden) {
       return `
         <div class="roll-slot" style="opacity: 0.3">
-          <div class="roll-slot-info">
-            <div class="roll-slot-category" data-category="${slot.category}">${slot.category}</div>
-            <div class="roll-slot-result text-muted">???</div>
+          <div class="roll-slot-main">
+            <div class="roll-slot-header">
+              <span class="roll-slot-category" data-category="${slot.category}">${slot.category}</span>
+              <span class="roll-slot-subclass text-muted">???</span>
+            </div>
           </div>
         </div>
       `;
@@ -628,29 +640,31 @@ function renderRevealMode(session) {
 
     return `
       <div class="roll-slot ${isCurrent ? 'roll-slot--active' : ''} ${hasExercise && hasReps ? 'roll-slot--complete' : ''}">
-        <div class="roll-slot-info">
-          <div class="roll-slot-category" data-category="${slot.category}">${categoryDisplay}</div>
-          ${hasExercise ? `
-            <div class="roll-slot-result">
-              ${slot.exerciseName}
-              ${hasReps ? `<strong>× ${slot.actualReps}</strong>` : ''}
-              <span class="text-muted">(${subclassName})</span>
-            </div>
-          ` : `<div class="roll-slot-result text-muted">${subclassName}</div>`}
-        </div>
-        ${isCurrent ? `
-          <div class="roll-controls">
-            ${!hasExercise ? `
-              <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
-                     min="1" max="${session.config.exerciseDie}">
-              <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
-            ` : !hasReps ? `
-              <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
-                     min="1" max="${session.config.repDie}">
-              <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll</button>
-            ` : ''}
+        <div class="roll-slot-main">
+          <div class="roll-slot-header">
+            <span class="roll-slot-category" data-category="${slot.category}">${categoryDisplay}</span>
+            ${hasExercise ? `
+              <span class="roll-slot-result">
+                ${slot.exerciseName}
+                ${hasReps ? `<strong>× ${slot.actualReps}</strong>` : ''}
+                <span class="text-muted">(${subclassName})</span>
+              </span>
+            ` : `<span class="roll-slot-subclass text-muted">${subclassName}</span>`}
           </div>
-        ` : ''}
+          ${hasControls ? `
+            <div class="roll-controls">
+              ${!hasExercise ? `
+                <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
+                       min="1" max="${session.config.exerciseDie}">
+                <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
+              ` : !hasReps ? `
+                <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
+                       min="1" max="${session.config.repDie}">
+                <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll</button>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
       </div>
     `;
   }).join('');
@@ -681,6 +695,11 @@ function updateRollSlot(container, session, index, isNewRound) {
   const canRerollClass = !isNewRound && isMulticlass && hasSubclass && !hasExercise;
   const canRerollReps = !isNewRound && hasReps;
 
+  // Determine if we need controls
+  const hasControls = (!isNewRound && isMulticlass && !hasSubclass) ||
+                      (!isNewRound && hasSubclass && !hasExercise) ||
+                      (hasExercise && !hasReps);
+
   // Update complete state
   if (hasExercise && hasReps) {
     slotEl.classList.add('roll-slot--complete');
@@ -688,48 +707,66 @@ function updateRollSlot(container, session, index, isNewRound) {
     slotEl.classList.remove('roll-slot--complete');
   }
 
-  // Update result text (includes reroll button when applicable)
-  const resultEl = slotEl.querySelector('.roll-slot-result');
-  if (resultEl) {
+  // Update the header content (category + result/subclass)
+  const headerEl = slotEl.querySelector('.roll-slot-header');
+  if (headerEl) {
     if (hasExercise) {
-      resultEl.innerHTML = `
-        ${canRerollExercise ? `<button class="reroll-btn" data-reroll="${index}" title="Reroll Exercise">↻</button>` : ''}
-        ${slot.exerciseName}
-        ${hasReps ? `${canRerollReps ? `<button class="reroll-btn" data-reroll-reps="${index}" title="Reroll Reps">↻</button>` : ''}<strong>× ${slot.actualReps}</strong>` : ''}
-        <span class="text-muted">(${subclassName})</span>
-      `;
-      resultEl.classList.remove('text-muted');
+      // Replace subclass span with result span if needed
+      const subclassEl = headerEl.querySelector('.roll-slot-subclass');
+      if (subclassEl) {
+        const resultSpan = document.createElement('span');
+        resultSpan.className = 'roll-slot-result';
+        resultSpan.innerHTML = `
+          ${canRerollExercise ? `<button class="reroll-btn" data-reroll="${index}" title="Reroll Exercise">↻</button>` : ''}
+          ${slot.exerciseName}
+          ${hasReps ? `${canRerollReps ? `<button class="reroll-btn" data-reroll-reps="${index}" title="Reroll Reps">↻</button>` : ''}<strong>× ${slot.actualReps}</strong>` : ''}
+          <span class="text-muted">(${subclassName})</span>
+        `;
+        subclassEl.replaceWith(resultSpan);
+      } else {
+        // Update existing result span
+        const resultEl = headerEl.querySelector('.roll-slot-result');
+        if (resultEl) {
+          resultEl.innerHTML = `
+            ${canRerollExercise ? `<button class="reroll-btn" data-reroll="${index}" title="Reroll Exercise">↻</button>` : ''}
+            ${slot.exerciseName}
+            ${hasReps ? `${canRerollReps ? `<button class="reroll-btn" data-reroll-reps="${index}" title="Reroll Reps">↻</button>` : ''}<strong>× ${slot.actualReps}</strong>` : ''}
+            <span class="text-muted">(${subclassName})</span>
+          `;
+        }
+      }
 
-      // Attach reroll exercise listener if button exists
-      const rerollExerciseBtn = resultEl.querySelector('[data-reroll]');
+      // Attach reroll listeners
+      const rerollExerciseBtn = headerEl.querySelector('[data-reroll]');
       if (rerollExerciseBtn) {
         attachRerollListener(container, rerollExerciseBtn, session, isNewRound);
       }
-
-      // Attach reroll reps listener if button exists
-      const rerollRepsBtn = resultEl.querySelector('[data-reroll-reps]');
+      const rerollRepsBtn = headerEl.querySelector('[data-reroll-reps]');
       if (rerollRepsBtn) {
         attachRerollRepsListener(container, rerollRepsBtn, session, isNewRound);
       }
     } else {
-      resultEl.innerHTML = `${canRerollClass ? `<button class="reroll-btn" data-reroll-class="${index}" title="Reroll Class">↻</button>` : ''}${subclassName}`;
-      resultEl.classList.add('text-muted');
+      // Update subclass display
+      const subclassEl = headerEl.querySelector('.roll-slot-subclass');
+      if (subclassEl) {
+        subclassEl.innerHTML = `${canRerollClass ? `<button class="reroll-btn" data-reroll-class="${index}" title="Reroll Class">↻</button>` : ''}${subclassName}`;
 
-      // Attach reroll class listener if button exists
-      const rerollClassBtn = resultEl.querySelector('[data-reroll-class]');
-      if (rerollClassBtn) {
-        attachRerollClassListener(container, rerollClassBtn, session, isNewRound);
+        const rerollClassBtn = subclassEl.querySelector('[data-reroll-class]');
+        if (rerollClassBtn) {
+          attachRerollClassListener(container, rerollClassBtn, session, isNewRound);
+        }
       }
     }
   }
 
   // Update controls
-  const controlsEl = slotEl.querySelector('.roll-controls');
-  if (controlsEl) {
+  const mainEl = slotEl.querySelector('.roll-slot-main');
+  let controlsEl = slotEl.querySelector('.roll-controls');
+
+  if (hasControls) {
     let newControls = '';
 
     if (!isNewRound && isMulticlass && !hasSubclass) {
-      // Only show classes that have this category available
       const validSubclasses = getSubclassesForCategory(session.config.subclasses, slot.category);
       newControls = `
         <select class="roll-select" data-slot="${index}" data-type="subclass">
@@ -758,10 +795,21 @@ function updateRollSlot(container, session, index, isNewRound) {
       `;
     }
 
-    controlsEl.innerHTML = newControls;
+    if (controlsEl) {
+      controlsEl.innerHTML = newControls;
+    } else {
+      // Create controls element if it doesn't exist
+      controlsEl = document.createElement('div');
+      controlsEl.className = 'roll-controls';
+      controlsEl.innerHTML = newControls;
+      mainEl.appendChild(controlsEl);
+    }
 
     // Re-attach listeners for the new controls
     attachSlotListeners(container, controlsEl, session, isNewRound);
+  } else if (controlsEl) {
+    // Remove controls if no longer needed
+    controlsEl.remove();
   }
 }
 

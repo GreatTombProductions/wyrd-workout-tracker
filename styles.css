@@ -743,10 +743,22 @@ input[type="text"]:focus {
   color: var(--accent-burgundy-light);
 }
 
-.roll-slot-info {
+/* Main content area of roll slot (header + controls) */
+.roll-slot-main {
   flex: 1;
-  min-width: 0; /* Allow text truncation in flex children */
-  overflow: hidden;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* Header row (category + subclass/result) */
+.roll-slot-header {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
 }
 
 .roll-slot-category {
@@ -754,6 +766,11 @@ input[type="text"]:focus {
   font-size: 0.875rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.roll-slot-subclass {
+  font-size: 0.875rem;
 }
 
 /* Category-specific colors */
@@ -778,7 +795,6 @@ input[type="text"]:focus {
 .roll-slot-result {
   font-size: 0.875rem;
   color: var(--text-secondary);
-  margin-top: var(--spacing-xs);
 }
 
 .roll-controls {
@@ -1075,6 +1091,23 @@ input[type="text"]:focus {
 .text-muted {
   color: var(--text-muted);
   font-size: 0.875em;
+}
+
+/* Mobile roll slot layout - stack labels and controls vertically */
+@media (max-width: 450px) {
+  .roll-slot-main {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-xs);
+  }
+
+  .roll-slot-header {
+    justify-content: space-between;
+  }
+
+  .roll-controls {
+    justify-content: flex-start;
+  }
 }
 
 /* Responsive adjustments */
