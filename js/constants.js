@@ -481,7 +481,7 @@ export const SUBCLASSES = {
   },
   wheelchair: {
     name: 'Combat Wheelchair',
-    equipment: 'Seated DB/Band/Weapon',
+    equipment: 'DB/Band/Weapon',
     exercises: {
       Push: [
         'Seated Dumbbell Overhead Tricep Extension',

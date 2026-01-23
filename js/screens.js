@@ -142,6 +142,47 @@ export function renderSetupScreen(container) {
 }
 
 function attachSetupListeners(container) {
+  // Helper to update subclass grid without full re-render
+  function updateSubclassGrid() {
+    const state = State.getState();
+    const config = state.sessionConfig;
+    const grid = container.querySelector('.subclass-grid');
+    if (!grid) return;
+
+    grid.innerHTML = Object.entries(SUBCLASSES).map(([key, subclass]) => `
+      <div class="subclass-option">
+        <input type="${config.multiclass ? 'checkbox' : 'radio'}"
+               id="subclass-${key}"
+               name="subclass"
+               value="${key}"
+               ${config.subclasses.includes(key) ? 'checked' : ''}>
+        <label for="subclass-${key}">
+          <span class="subclass-name">${subclass.name}</span>
+          <span class="subclass-equipment">${subclass.equipment}</span>
+        </label>
+      </div>
+    `).join('');
+
+    // Re-attach subclass listeners
+    attachSubclassListeners();
+  }
+
+  // Attach listeners to subclass inputs
+  function attachSubclassListeners() {
+    container.querySelectorAll('input[name="subclass"]').forEach(input => {
+      input.addEventListener('change', () => {
+        const checked = Array.from(container.querySelectorAll('input[name="subclass"]:checked'))
+          .map(el => el.value);
+        if (checked.length > 0) {
+          State.updateConfig({ subclasses: checked });
+        } else {
+          // Prevent deselecting all - recheck this one
+          input.checked = true;
+        }
+      });
+    });
+  }
+
   // Multiclass toggle
   const multiclassToggle = container.querySelector('#multiclass-toggle');
   if (multiclassToggle) {
@@ -154,24 +195,13 @@ function attachSetupListeners(container) {
       } else {
         State.updateConfig({ multiclass: isMulticlass });
       }
-      // Re-render to change input types
-      renderSetupScreen(container);
+      // Update just the subclass grid
+      updateSubclassGrid();
     });
   }
 
-  // Subclass selection (works for both radio and checkbox)
-  container.querySelectorAll('input[name="subclass"]').forEach(input => {
-    input.addEventListener('change', () => {
-      const checked = Array.from(container.querySelectorAll('input[name="subclass"]:checked'))
-        .map(el => el.value);
-      if (checked.length > 0) {
-        State.updateConfig({ subclasses: checked });
-      } else {
-        // Prevent deselecting all - recheck this one
-        input.checked = true;
-      }
-    });
-  });
+  // Initial subclass listeners
+  attachSubclassListeners();
 
   // Dice link toggle
   const diceLinkBtn = container.querySelector('#dice-link-toggle');
@@ -498,77 +528,160 @@ function canEnterWorkout(session, isNewRound) {
   return allSubclassesSelected && State.allExercisesRolled() && State.allRepsRolled();
 }
 
-function attachRollListeners(container, session, isNewRound) {
-  // Roll subclass buttons
-  container.querySelectorAll('[data-roll-subclass]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const index = parseInt(btn.dataset.rollSubclass);
-      const select = container.querySelector(`select[data-slot="${index}"][data-type="subclass"]`);
+// Update a single roll slot's DOM without full re-render
+function updateRollSlot(container, session, index, isNewRound) {
+  const slot = session.slots[index];
+  const slotEl = container.querySelectorAll('.roll-slot')[index];
+  if (!slotEl) return;
+
+  const hasSubclass = slot.subclass !== null;
+  const hasExercise = slot.exerciseIndex !== null;
+  const hasReps = slot.repRoll !== null;
+  const subclassName = hasSubclass ? (SUBCLASSES[slot.subclass]?.name || slot.subclass) : '???';
+  const isMulticlass = session.config.multiclass && session.config.subclasses.length > 1;
+
+  // Update complete state
+  if (hasExercise && hasReps) {
+    slotEl.classList.add('roll-slot--complete');
+  }
+
+  // Update result text
+  const resultEl = slotEl.querySelector('.roll-slot-result');
+  if (resultEl) {
+    if (hasExercise) {
+      resultEl.innerHTML = `
+        ${slot.exerciseName}
+        ${hasReps ? `<strong>× ${slot.actualReps}</strong>` : ''}
+        <span class="text-muted">(${subclassName})</span>
+      `;
+      resultEl.classList.remove('text-muted');
+    } else {
+      resultEl.textContent = subclassName;
+      resultEl.classList.add('text-muted');
+    }
+  }
+
+  // Update controls
+  const controlsEl = slotEl.querySelector('.roll-controls');
+  if (controlsEl) {
+    let newControls = '';
+
+    if (!isNewRound && isMulticlass && !hasSubclass) {
+      newControls = `
+        <select class="roll-select" data-slot="${index}" data-type="subclass">
+          <option value="">Select...</option>
+          ${session.config.subclasses.map(key => `
+            <option value="${key}">${SUBCLASSES[key]?.name || key}</option>
+          `).join('')}
+        </select>
+        <button class="btn btn--small" data-roll-subclass="${index}">Roll<br>Class</button>
+      `;
+    } else if (!isNewRound && hasSubclass && !hasExercise) {
+      newControls = `
+        <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
+               min="1" max="${session.config.exerciseDie}" placeholder="1-${session.config.exerciseDie}">
+        <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
+      `;
+    } else if (hasExercise && !hasReps) {
+      newControls = `
+        <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
+               min="1" max="${session.config.repDie}" placeholder="1-${session.config.repDie}">
+        <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
+      `;
+    }
+
+    controlsEl.innerHTML = newControls;
+
+    // Re-attach listeners for the new controls
+    attachSlotListeners(container, controlsEl, session, isNewRound);
+  }
+}
+
+// Update the Enter button disabled state
+function updateEnterButton(container, session, isNewRound) {
+  const enterBtn = container.querySelector('#enter-workout');
+  if (enterBtn) {
+    enterBtn.disabled = !canEnterWorkout(session, isNewRound);
+  }
+}
+
+// Attach listeners to a single slot's controls
+function attachSlotListeners(container, controlsEl, session, isNewRound) {
+  // Roll subclass button
+  const subclassBtn = controlsEl.querySelector('[data-roll-subclass]');
+  if (subclassBtn) {
+    subclassBtn.addEventListener('click', () => {
+      const index = parseInt(subclassBtn.dataset.rollSubclass);
+      const select = controlsEl.querySelector(`select[data-type="subclass"]`);
       const manualValue = select && select.value ? select.value : null;
 
-      // Add animation class
-      btn.classList.add('dice-roll');
-
+      subclassBtn.classList.add('dice-roll');
       State.rollSubclassForSlot(index, manualValue);
 
-      // Re-render after a brief delay for animation
       setTimeout(() => {
-        if (window.wyrdForceRender) window.wyrdForceRender();
+        updateRollSlot(container, State.getState().session, index, isNewRound);
+        updateEnterButton(container, State.getState().session, isNewRound);
       }, 100);
     });
-  });
+  }
 
-  // Subclass select change (auto-apply when selected)
-  container.querySelectorAll('select[data-type="subclass"]').forEach(select => {
-    select.addEventListener('change', () => {
-      if (select.value) {
-        const index = parseInt(select.dataset.slot);
-        State.rollSubclassForSlot(index, select.value);
+  // Subclass select
+  const subclassSelect = controlsEl.querySelector('select[data-type="subclass"]');
+  if (subclassSelect) {
+    subclassSelect.addEventListener('change', () => {
+      if (subclassSelect.value) {
+        const index = parseInt(subclassSelect.dataset.slot);
+        State.rollSubclassForSlot(index, subclassSelect.value);
 
-        // Re-render
         setTimeout(() => {
-          if (window.wyrdForceRender) window.wyrdForceRender();
+          updateRollSlot(container, State.getState().session, index, isNewRound);
+          updateEnterButton(container, State.getState().session, isNewRound);
         }, 100);
       }
     });
-  });
+  }
 
-  // Roll exercise buttons
-  container.querySelectorAll('[data-roll-exercise]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const index = parseInt(btn.dataset.rollExercise);
-      const input = container.querySelector(`input[data-slot="${index}"][data-type="exercise"]`);
+  // Roll exercise button
+  const exerciseBtn = controlsEl.querySelector('[data-roll-exercise]');
+  if (exerciseBtn) {
+    exerciseBtn.addEventListener('click', () => {
+      const index = parseInt(exerciseBtn.dataset.rollExercise);
+      const input = controlsEl.querySelector(`input[data-type="exercise"]`);
       const manualValue = input && input.value ? parseInt(input.value) : null;
 
-      // Add animation class
-      btn.classList.add('dice-roll');
-
+      exerciseBtn.classList.add('dice-roll');
       State.rollExerciseForSlot(index, manualValue);
 
-      // Re-render after a brief delay for animation
       setTimeout(() => {
-        if (window.wyrdForceRender) window.wyrdForceRender();
+        updateRollSlot(container, State.getState().session, index, isNewRound);
+        updateEnterButton(container, State.getState().session, isNewRound);
       }, 100);
     });
-  });
+  }
 
-  // Roll reps buttons
-  container.querySelectorAll('[data-roll-reps]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const index = parseInt(btn.dataset.rollReps);
-      const input = container.querySelector(`input[data-slot="${index}"][data-type="reps"]`);
+  // Roll reps button
+  const repsBtn = controlsEl.querySelector('[data-roll-reps]');
+  if (repsBtn) {
+    repsBtn.addEventListener('click', () => {
+      const index = parseInt(repsBtn.dataset.rollReps);
+      const input = controlsEl.querySelector(`input[data-type="reps"]`);
       const manualValue = input && input.value ? parseInt(input.value) : null;
 
-      // Add animation class
-      btn.classList.add('dice-roll');
-
+      repsBtn.classList.add('dice-roll');
       State.rollRepsForSlot(index, manualValue);
 
-      // Re-render after a brief delay for animation
       setTimeout(() => {
-        if (window.wyrdForceRender) window.wyrdForceRender();
+        updateRollSlot(container, State.getState().session, index, isNewRound);
+        updateEnterButton(container, State.getState().session, isNewRound);
       }, 100);
     });
+  }
+}
+
+function attachRollListeners(container, session, isNewRound) {
+  // Attach listeners to each slot's controls
+  container.querySelectorAll('.roll-controls').forEach(controlsEl => {
+    attachSlotListeners(container, controlsEl, session, isNewRound);
   });
 
   // Enter workout button
@@ -627,11 +740,11 @@ export function renderWorkoutScreen(container) {
       </div>
 
       <div class="screen-footer">
-        <button class="btn btn--full btn--pulse mb-md" id="complete-exercise">
+        <button class="btn btn--full btn--complete mb-md" id="complete-exercise">
           Complete
         </button>
-        <button class="btn btn--full btn--secondary" id="complete-round">
-          Complete Round (${remainingInRound})
+        <button class="btn btn--full btn--danger" id="complete-round">
+          Complete Round (${remainingInRound} exercises)
         </button>
       </div>
     </div>
