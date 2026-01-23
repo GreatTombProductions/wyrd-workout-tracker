@@ -152,6 +152,7 @@ h3 {
 .btn--small {
   padding: var(--spacing-sm) var(--spacing-md);
   font-size: 0.875rem;
+  min-width: 80px;
 }
 
 .btn--full {

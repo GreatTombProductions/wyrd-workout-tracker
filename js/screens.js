@@ -73,31 +73,7 @@ export function renderSetupScreen(container) {
                    min="50"
                    max="1000"
                    step="10">
-            <button type="button" class="btn btn--small btn--secondary" id="set-recommended-hp">
-              Use ${getRecommendedHP(config.repDie)}
-            </button>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Roll Mode</label>
-          <div class="toggle-group">
-            <div class="toggle-option">
-              <input type="radio"
-                     id="roll-mode-all"
-                     name="rollMode"
-                     value="all-at-once"
-                     ${config.rollMode === 'all-at-once' ? 'checked' : ''}>
-              <label for="roll-mode-all">All at Once</label>
-            </div>
-            <div class="toggle-option">
-              <input type="radio"
-                     id="roll-mode-reveal"
-                     name="rollMode"
-                     value="reveal"
-                     ${config.rollMode === 'reveal' ? 'checked' : ''}>
-              <label for="roll-mode-reveal">Reveal as You Go</label>
-            </div>
+            <span class="hp-recommendation">Recommended: ${getRecommendedHP(config.repDie)}</span>
           </div>
         </div>
 
@@ -157,32 +133,19 @@ function attachSetupListeners(container) {
     });
   });
 
-  // Rep die
+  // Rep die - auto-sets HP to recommended value
   container.querySelectorAll('input[name="repDie"]').forEach(input => {
     input.addEventListener('change', () => {
       const value = parseInt(input.value);
-      State.updateConfig({ repDie: value });
-      // Update recommended HP button
-      const hpBtn = container.querySelector('#set-recommended-hp');
-      if (hpBtn) {
-        hpBtn.textContent = `Use ${getRecommendedHP(value)}`;
-      }
+      const recommended = getRecommendedHP(value);
+      State.updateConfig({ repDie: value, hpThreshold: recommended });
+      // Update HP input and recommendation text
+      const hpInput = container.querySelector('#hp-threshold');
+      const hpRec = container.querySelector('.hp-recommendation');
+      if (hpInput) hpInput.value = recommended;
+      if (hpRec) hpRec.textContent = `Recommended: ${recommended}`;
     });
   });
-
-  // Set recommended HP button
-  const recHpBtn = container.querySelector('#set-recommended-hp');
-  if (recHpBtn) {
-    recHpBtn.addEventListener('click', () => {
-      const state = State.getState();
-      const recommended = getRecommendedHP(state.sessionConfig.repDie);
-      const hpInput = container.querySelector('#hp-threshold');
-      if (hpInput) {
-        hpInput.value = recommended;
-        State.updateConfig({ hpThreshold: recommended });
-      }
-    });
-  }
 
   // HP threshold
   const hpInput = container.querySelector('#hp-threshold');
@@ -191,13 +154,6 @@ function attachSetupListeners(container) {
       State.updateConfig({ hpThreshold: parseInt(hpInput.value) || 150 });
     });
   }
-
-  // Roll mode
-  container.querySelectorAll('input[name="rollMode"]').forEach(input => {
-    input.addEventListener('change', () => {
-      State.updateConfig({ rollMode: input.value });
-    });
-  });
 
   // Rep mode
   container.querySelectorAll('input[name="repMode"]').forEach(input => {
@@ -226,7 +182,6 @@ export function renderRollScreen(container) {
     return;
   }
 
-  const isRevealMode = session.config.rollMode === 'reveal';
   const isNewRound = session.currentRound > 1 && session.config.repMode === 'per-round';
 
   container.innerHTML = `
@@ -234,7 +189,7 @@ export function renderRollScreen(container) {
       <h1>${isNewRound ? `Round ${session.currentRound}` : 'Roll Your Fate'}</h1>
 
       <div class="screen-content">
-        ${isRevealMode ? renderRevealMode(session) : renderAllAtOnceMode(session, isNewRound)}
+        ${renderAllAtOnceMode(session, isNewRound)}
       </div>
 
       <div class="screen-footer">
@@ -417,6 +372,7 @@ export function renderWorkoutScreen(container) {
 
   const currentSlot = State.getCurrentSlot();
   const hpPercent = Math.max(0, (session.hpRemaining / session.config.hpThreshold) * 100);
+  const remainingInRound = session.slots.length - session.currentSlotIndex;
 
   container.innerHTML = `
     <div class="screen">
@@ -454,7 +410,7 @@ export function renderWorkoutScreen(container) {
           Complete
         </button>
         <button class="btn btn--full btn--secondary" id="complete-round">
-          Complete Round
+          Complete Round (${remainingInRound})
         </button>
       </div>
     </div>
