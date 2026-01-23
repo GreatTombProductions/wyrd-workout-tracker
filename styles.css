@@ -152,7 +152,7 @@ h3 {
 .btn--small {
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: 0.625rem;
-  min-width: 54px;
+  min-width: 64px;
   line-height: 1.2;
   letter-spacing: 0.05em;
 }
@@ -525,13 +525,25 @@ input[type="text"]:focus {
 
 .roll-controls {
   display: flex;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
   align-items: center;
+  flex-shrink: 0;
+}
+
+.roll-subheader {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-top: calc(var(--spacing-md) * -1);
+  margin-bottom: var(--spacing-md);
 }
 
 .roll-input {
-  width: 60px;
+  width: 50px;
+  min-width: 50px;
+  max-width: 50px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 /* Dice animation */

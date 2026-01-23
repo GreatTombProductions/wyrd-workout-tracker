@@ -210,6 +210,7 @@ export function renderRollScreen(container) {
   container.innerHTML = `
     <div class="screen">
       <h1>${isNewRound ? `Round ${session.currentRound}` : 'Roll Your Fate'}</h1>
+      ${!isNewRound ? '<p class="roll-subheader">Use inputs for physical dice</p>' : ''}
 
       <div class="screen-content">
         ${renderAllAtOnceMode(session, isNewRound)}
