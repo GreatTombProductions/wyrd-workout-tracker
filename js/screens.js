@@ -1263,6 +1263,126 @@ export function renderWorkoutScreen(container) {
   attachWorkoutListeners(container, isFinal);
 }
 
+// Update workout UI without full re-render (preserves timer state)
+function updateWorkoutUI(container) {
+  const state = State.getState();
+  const session = state.session;
+  if (!session) return;
+
+  const currentSlot = State.getCurrentSlot();
+  const hpPercent = Math.max(0, (session.hpRemaining / session.config.hpThreshold) * 100);
+  const remainingInRound = session.slots.length - session.currentSlotIndex;
+  const isFinal = State.isFinalExercise();
+  const minReps = State.getMinRepsToFinish();
+
+  // Update HP bar
+  const hpFill = container.querySelector('.hp-bar-fill');
+  const hpText = container.querySelector('.hp-bar-text');
+  if (hpFill) hpFill.style.width = `${hpPercent}%`;
+  if (hpText) hpText.textContent = `${session.hpRemaining} / ${session.config.hpThreshold}`;
+
+  // Update round indicator
+  const roundIndicator = container.querySelector('.round-indicator');
+  if (roundIndicator) roundIndicator.textContent = `Round ${session.currentRound}`;
+
+  // Update exercise card
+  if (currentSlot) {
+    const categoryEl = container.querySelector('.exercise-category');
+    const nameEl = container.querySelector('.exercise-name');
+    const repsEl = container.querySelector('#rep-display');
+
+    if (categoryEl) {
+      categoryEl.textContent = currentSlot.category;
+      categoryEl.dataset.category = currentSlot.category;
+    }
+    if (nameEl) nameEl.textContent = currentSlot.exerciseName;
+    if (repsEl) repsEl.textContent = currentSlot.actualReps;
+
+    // Handle final rep slider
+    const exerciseCard = container.querySelector('.exercise-card');
+    const existingSlider = container.querySelector('.final-rep-slider');
+
+    if (isFinal && !existingSlider && exerciseCard) {
+      // Add slider for final exercise
+      const sliderDiv = document.createElement('div');
+      sliderDiv.className = 'final-rep-slider';
+      sliderDiv.innerHTML = `
+        <input type="range" id="rep-slider"
+               min="${minReps}" max="${currentSlot.actualReps}"
+               value="${currentSlot.actualReps}">
+        <div class="slider-labels">
+          <span>${minReps} (min)</span>
+          <span>${currentSlot.actualReps} (full)</span>
+        </div>
+      `;
+      exerciseCard.appendChild(sliderDiv);
+
+      // Attach slider listener
+      const slider = sliderDiv.querySelector('#rep-slider');
+      slider.addEventListener('input', () => {
+        repsEl.textContent = slider.value;
+      });
+    } else if (!isFinal && existingSlider) {
+      // Remove slider if no longer final
+      existingSlider.remove();
+    }
+  }
+
+  // Update round progress dots
+  const dotsContainer = container.querySelector('.round-progress');
+  if (dotsContainer) {
+    dotsContainer.innerHTML = session.slots.map((slot, index) => `
+      <div class="round-dot ${slot.completed ? 'round-dot--completed' : ''} ${index === session.currentSlotIndex ? 'round-dot--current' : ''}"></div>
+    `).join('');
+  }
+
+  // Update button text
+  const completeBtn = container.querySelector('#complete-exercise');
+  const completeRoundBtn = container.querySelector('#complete-round');
+
+  if (completeBtn) {
+    completeBtn.textContent = isFinal ? 'Finish Workout' : 'Complete';
+  }
+  if (completeRoundBtn) {
+    completeRoundBtn.textContent = `Complete Round (${remainingInRound} exercises)`;
+  }
+
+  // Re-attach completion listeners with updated isFinal state
+  reattachCompletionListeners(container, isFinal);
+}
+
+// Re-attach completion listeners (needed after updating isFinal state)
+function reattachCompletionListeners(container, isFinal) {
+  const slider = container.querySelector('#rep-slider');
+
+  const completeBtn = container.querySelector('#complete-exercise');
+  if (completeBtn) {
+    const newBtn = completeBtn.cloneNode(true);
+    completeBtn.parentNode.replaceChild(newBtn, completeBtn);
+    newBtn.addEventListener('click', () => {
+      const customReps = isFinal && slider ? parseInt(slider.value) : null;
+      State.completeCurrentExercise(customReps);
+      const state = State.getState();
+      if (state.currentScreen === 'workout') {
+        updateWorkoutUI(container);
+      }
+    });
+  }
+
+  const completeRoundBtn = container.querySelector('#complete-round');
+  if (completeRoundBtn) {
+    const newBtn = completeRoundBtn.cloneNode(true);
+    completeRoundBtn.parentNode.replaceChild(newBtn, completeRoundBtn);
+    newBtn.addEventListener('click', () => {
+      State.completeRound();
+      const state = State.getState();
+      if (state.currentScreen === 'workout') {
+        updateWorkoutUI(container);
+      }
+    });
+  }
+}
+
 function attachWorkoutListeners(container, isFinal) {
   // Pause/resume button
   const pauseBtn = container.querySelector('#pause-timer');
@@ -1298,10 +1418,10 @@ function attachWorkoutListeners(container, isFinal) {
       // Use slider value if this is the final exercise
       const customReps = isFinal && slider ? parseInt(slider.value) : null;
       State.completeCurrentExercise(customReps);
-      // Re-render if still on workout screen (victory transition handled by state)
+      // Update UI if still on workout screen (victory transition handled by state)
       const state = State.getState();
-      if (state.currentScreen === 'workout' && window.wyrdForceRender) {
-        window.wyrdForceRender();
+      if (state.currentScreen === 'workout') {
+        updateWorkoutUI(container);
       }
     });
   }
@@ -1310,10 +1430,10 @@ function attachWorkoutListeners(container, isFinal) {
   if (completeRoundBtn) {
     completeRoundBtn.addEventListener('click', () => {
       State.completeRound();
-      // Re-render if still on workout screen
+      // Update UI if still on workout screen
       const state = State.getState();
-      if (state.currentScreen === 'workout' && window.wyrdForceRender) {
-        window.wyrdForceRender();
+      if (state.currentScreen === 'workout') {
+        updateWorkoutUI(container);
       }
     });
   }
