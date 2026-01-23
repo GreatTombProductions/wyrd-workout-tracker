@@ -743,13 +743,13 @@ input[type="text"]:focus {
   color: var(--accent-burgundy-light);
 }
 
-/* Main content area of roll slot (header + controls) */
+/* Main content area of roll slot (header + exercise + controls) */
 .roll-slot-main {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
+  flex-direction: column;
+  gap: var(--spacing-xs);
 }
 
 /* Header row (category + subclass/result) */
@@ -783,6 +783,15 @@ input[type="text"]:focus {
   margin-right: var(--spacing-xs);
 }
 
+/* Reps row (shown when complete) */
+.roll-slot-reps {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  min-height: var(--touch-min);
+  display: flex;
+  align-items: center;
+}
+
 /* Category-specific colors */
 .roll-slot-category[data-category="Push"] { color: var(--cat-push); }
 .roll-slot-category[data-category="Pull"] { color: var(--cat-pull); }
@@ -807,6 +816,7 @@ input[type="text"]:focus {
   gap: var(--spacing-xs);
   align-items: center;
   flex-shrink: 0;
+  min-height: var(--touch-min);
 }
 
 .roll-subheader {
@@ -818,9 +828,9 @@ input[type="text"]:focus {
 }
 
 .roll-input {
-  width: 90px;
-  min-width: 90px;
-  max-width: 90px;
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
   text-align: center;
   flex-shrink: 0;
 }
@@ -1098,14 +1108,8 @@ input[type="text"]:focus {
   font-size: 0.875em;
 }
 
-/* Mobile roll slot layout - stack labels and controls vertically */
+/* Mobile roll slot layout - spread labels and controls */
 @media (max-width: 450px) {
-  .roll-slot-main {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--spacing-xs);
-  }
-
   .roll-slot-header {
     justify-content: space-between;
   }
@@ -1151,7 +1155,8 @@ input[type="text"]:focus {
     margin-left: var(--spacing-xs);
   }
 
-  .roll-select {
+  .roll-select,
+  .roll-input {
     width: 110px;
     min-width: 110px;
     max-width: 110px;
