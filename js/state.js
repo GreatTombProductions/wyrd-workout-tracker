@@ -36,10 +36,9 @@ export function setScreen(screen) {
   notify();
 }
 
-// Update session config
+// Update session config (no notify - setup screen handles its own state)
 export function updateConfig(updates) {
   sessionConfig = { ...sessionConfig, ...updates };
-  notify();
 }
 
 // Roll a die
@@ -106,7 +105,7 @@ export function initSession() {
   notify();
 }
 
-// Roll exercise for a slot
+// Roll exercise for a slot (no notify - caller handles re-render)
 export function rollExerciseForSlot(slotIndex, manualValue = null) {
   if (!session || !session.slots[slotIndex]) return;
 
@@ -122,10 +121,9 @@ export function rollExerciseForSlot(slotIndex, manualValue = null) {
   slot.exerciseName = getExercise(slot.subclass, slot.category, roll);
 
   saveSession();
-  notify();
 }
 
-// Roll reps for a slot
+// Roll reps for a slot (no notify - caller handles re-render)
 export function rollRepsForSlot(slotIndex, manualValue = null) {
   if (!session || !session.slots[slotIndex]) return;
 
@@ -146,7 +144,6 @@ export function rollRepsForSlot(slotIndex, manualValue = null) {
   }
 
   saveSession();
-  notify();
 }
 
 // Check if all slots have exercises rolled
@@ -161,16 +158,15 @@ export function allRepsRolled() {
   return session.slots.every(slot => slot.repRoll !== null);
 }
 
-// Start the workout timer
+// Start the workout timer (no notify - called before setScreen)
 export function startTimer() {
   if (!session) return;
   session.timer.running = true;
   session.timer.lastTick = Date.now();
   saveSession();
-  notify();
 }
 
-// Update timer (call this from animation frame)
+// Update timer (call this from animation frame) - no notify, caller updates display
 export function updateTimer() {
   if (!session || !session.timer.running) return;
 
@@ -179,18 +175,14 @@ export function updateTimer() {
     session.timer.elapsed += now - session.timer.lastTick;
   }
   session.timer.lastTick = now;
-
-  // Don't save on every tick, just notify for UI update
-  notify();
 }
 
-// Stop the timer
+// Stop the timer (no notify - called before setScreen)
 export function stopTimer() {
   if (!session) return;
   session.timer.running = false;
   session.timer.lastTick = null;
   saveSession();
-  notify();
 }
 
 // Complete current exercise
@@ -245,7 +237,7 @@ export function completeRound() {
   startNewRound();
 }
 
-// Advance to next slot
+// Advance to next slot (no notify - caller handles re-render)
 function advanceToNextSlot() {
   if (!session) return;
 
@@ -257,7 +249,6 @@ function advanceToNextSlot() {
   } else {
     session.currentSlotIndex = nextIndex;
     saveSession();
-    notify();
   }
 }
 
@@ -299,7 +290,7 @@ function startNewRound() {
   }
 
   saveSession();
-  notify();
+  // No notify - caller (workout listener) handles re-render
 }
 
 // Save session to localStorage

@@ -273,13 +273,13 @@ function renderAllAtOnceMode(session, isNewRound) {
             ${!hasExercise ? `
               <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
                      min="1" max="${session.config.exerciseDie}" placeholder="1-${session.config.exerciseDie}">
-              <button class="btn btn--small" data-roll-exercise="${index}">Roll</button>
+              <button class="btn btn--small" data-roll-exercise="${index}">Exercise</button>
             ` : ''}
           ` : ''}
           ${hasExercise && !hasReps ? `
             <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
                    min="1" max="${session.config.repDie}" placeholder="1-${session.config.repDie}">
-            <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll</button>
+            <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Reps</button>
           ` : ''}
         </div>
       </div>
@@ -335,7 +335,7 @@ function renderRevealMode(session) {
             ${!hasExercise ? `
               <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
                      min="1" max="${session.config.exerciseDie}" placeholder="1-${session.config.exerciseDie}">
-              <button class="btn btn--small" data-roll-exercise="${index}">Roll</button>
+              <button class="btn btn--small" data-roll-exercise="${index}">Exercise</button>
             ` : !hasReps ? `
               <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
                      min="1" max="${session.config.repDie}" placeholder="1-${session.config.repDie}">
@@ -366,9 +366,13 @@ function attachRollListeners(container, session, isNewRound) {
 
       // Add animation class
       btn.classList.add('dice-roll');
-      setTimeout(() => btn.classList.remove('dice-roll'), 500);
 
       State.rollExerciseForSlot(index, manualValue);
+
+      // Re-render after a brief delay for animation
+      setTimeout(() => {
+        if (window.wyrdForceRender) window.wyrdForceRender();
+      }, 100);
     });
   });
 
@@ -381,9 +385,13 @@ function attachRollListeners(container, session, isNewRound) {
 
       // Add animation class
       btn.classList.add('dice-roll');
-      setTimeout(() => btn.classList.remove('dice-roll'), 500);
 
       State.rollRepsForSlot(index, manualValue);
+
+      // Re-render after a brief delay for animation
+      setTimeout(() => {
+        if (window.wyrdForceRender) window.wyrdForceRender();
+      }, 100);
     });
   });
 
@@ -460,6 +468,11 @@ function attachWorkoutListeners(container) {
   if (completeBtn) {
     completeBtn.addEventListener('click', () => {
       State.completeCurrentExercise();
+      // Re-render if still on workout screen (victory transition handled by state)
+      const state = State.getState();
+      if (state.currentScreen === 'workout' && window.wyrdForceRender) {
+        window.wyrdForceRender();
+      }
     });
   }
 
@@ -467,6 +480,11 @@ function attachWorkoutListeners(container) {
   if (completeRoundBtn) {
     completeRoundBtn.addEventListener('click', () => {
       State.completeRound();
+      // Re-render if still on workout screen
+      const state = State.getState();
+      if (state.currentScreen === 'workout' && window.wyrdForceRender) {
+        window.wyrdForceRender();
+      }
     });
   }
 }

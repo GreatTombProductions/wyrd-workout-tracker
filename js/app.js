@@ -5,12 +5,20 @@ import * as Screens from './screens.js';
 
 const app = document.getElementById('app');
 let timerRAF = null;
+let lastScreen = null;
 
-// Main render function
-function render() {
-  const state = State.getState();
+// Main render function - only re-renders when screen changes
+function render(state) {
+  // Only do full re-render when screen changes
+  if (state.currentScreen !== lastScreen) {
+    lastScreen = state.currentScreen;
+    renderScreen(state.currentScreen);
+  }
+}
 
-  switch (state.currentScreen) {
+// Render a specific screen
+function renderScreen(screen) {
+  switch (screen) {
     case 'setup':
       Screens.renderSetupScreen(app);
       break;
@@ -28,7 +36,13 @@ function render() {
   }
 }
 
-// Timer update loop
+// Force re-render current screen (for roll updates, etc.)
+export function forceRender() {
+  const state = State.getState();
+  renderScreen(state.currentScreen);
+}
+
+// Timer update loop - only updates timer display, not full re-render
 function timerLoop() {
   const state = State.getState();
 
@@ -52,7 +66,7 @@ function startPeriodicSave() {
     if (state.session && state.session.timer.running) {
       State.saveSession();
     }
-  }, 5000); // Save every 5 seconds during workout
+  }, 5000);
 }
 
 // Check for saved session on load
@@ -62,28 +76,34 @@ function checkSavedSession() {
     if (loaded) {
       const state = State.getState();
 
+      // Render setup first as background
+      renderScreen('setup');
+
       // Show resume modal
-      Screens.renderSetupScreen(app);
       Screens.renderResumeModal(
         app,
         // On resume
         () => {
           // Determine which screen to show based on session state
           if (state.session.hpRemaining <= 0) {
+            lastScreen = 'victory';
             State.setScreen('victory');
           } else if (!State.allExercisesRolled() || !State.allRepsRolled()) {
+            lastScreen = 'roll';
             State.setScreen('roll');
           } else {
             // Resume timer if it was running
             if (state.session.timer.running) {
               state.session.timer.lastTick = Date.now();
             }
+            lastScreen = 'workout';
             State.setScreen('workout');
           }
         },
         // On abandon
         () => {
           State.clearSession();
+          lastScreen = 'setup';
           State.setScreen('setup');
         }
       );
@@ -92,12 +112,13 @@ function checkSavedSession() {
   }
 
   // No saved session, show setup
-  State.setScreen('setup');
+  lastScreen = 'setup';
+  renderScreen('setup');
 }
 
 // Initialize the app
 function init() {
-  // Subscribe to state changes
+  // Subscribe to state changes (screen changes only trigger re-render)
   State.subscribe(render);
 
   // Start timer loop
@@ -109,6 +130,9 @@ function init() {
   // Check for saved session
   checkSavedSession();
 }
+
+// Expose forceRender for use by other modules
+window.wyrdForceRender = forceRender;
 
 // Start the app when DOM is ready
 if (document.readyState === 'loading') {
