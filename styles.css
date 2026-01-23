@@ -773,6 +773,16 @@ input[type="text"]:focus {
   font-size: 0.875rem;
 }
 
+/* Exercise row (name + reps) */
+.roll-slot-exercise {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.roll-slot-exercise-name {
+  margin-right: var(--spacing-xs);
+}
+
 /* Category-specific colors */
 .roll-slot-category[data-category="Push"] { color: var(--cat-push); }
 .roll-slot-category[data-category="Pull"] { color: var(--cat-pull); }
@@ -791,11 +801,6 @@ input[type="text"]:focus {
 .exercise-category[data-category="Cardio"] { color: var(--cat-cardio); }
 .exercise-category[data-category="Upper Body"] { color: var(--cat-upper); }
 .exercise-category[data-category="Lower Body"] { color: var(--cat-lower); }
-
-.roll-slot-result {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
 
 .roll-controls {
   display: flex;
@@ -1106,7 +1111,7 @@ input[type="text"]:focus {
   }
 
   .roll-controls {
-    justify-content: flex-start;
+    justify-content: space-between;
   }
 }
 
