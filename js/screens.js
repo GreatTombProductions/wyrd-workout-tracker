@@ -47,11 +47,27 @@ export function renderSetupScreen(container) {
                        id="exercise-die-${size}"
                        name="exerciseDie"
                        value="${size}"
-                       ${config.exerciseDie === size ? 'checked' : ''}>
+                       ${config.exerciseDie === size && DIE_SIZES.includes(config.exerciseDie) ? 'checked' : ''}>
                 <label for="exercise-die-${size}">D${size}</label>
               </div>
             `).join('')}
+            <div class="die-option die-option--custom">
+              <input type="radio"
+                     id="exercise-die-custom"
+                     name="exerciseDie"
+                     value="custom"
+                     ${!DIE_SIZES.includes(config.exerciseDie) ? 'checked' : ''}>
+              <label for="exercise-die-custom">D</label>
+              <input type="number"
+                     id="exercise-die-custom-input"
+                     class="die-custom-input"
+                     min="2"
+                     max="100"
+                     value="${!DIE_SIZES.includes(config.exerciseDie) ? config.exerciseDie : ''}"
+                     placeholder="?">
+            </div>
           </div>
+          <div class="die-guide">Beginner: D4–D6 · Intermediate: D6–D20 · Advanced: D20</div>
         </div>
 
         <div class="die-link-row">
@@ -70,11 +86,27 @@ export function renderSetupScreen(container) {
                        id="rep-die-${size}"
                        name="repDie"
                        value="${size}"
-                       ${config.repDie === size ? 'checked' : ''}>
+                       ${config.repDie === size && DIE_SIZES.includes(config.repDie) ? 'checked' : ''}>
                 <label for="rep-die-${size}">D${size}</label>
               </div>
             `).join('')}
+            <div class="die-option die-option--custom">
+              <input type="radio"
+                     id="rep-die-custom"
+                     name="repDie"
+                     value="custom"
+                     ${!DIE_SIZES.includes(config.repDie) ? 'checked' : ''}>
+              <label for="rep-die-custom">D</label>
+              <input type="number"
+                     id="rep-die-custom-input"
+                     class="die-custom-input"
+                     min="2"
+                     max="100"
+                     value="${!DIE_SIZES.includes(config.repDie) ? config.repDie : ''}"
+                     placeholder="?">
+            </div>
           </div>
+          <div class="die-guide">Beginner: D4–D6 · Intermediate: D8–D12 · Advanced: D12–D20</div>
         </div>
 
         <div class="form-group">
@@ -172,49 +204,82 @@ function attachSetupListeners(container) {
     });
   }
 
-  // Exercise die - syncs rep die if locked
-  container.querySelectorAll('input[name="exerciseDie"]').forEach(input => {
-    input.addEventListener('change', () => {
-      const value = parseInt(input.value);
-      const state = State.getState();
-      if (state.sessionConfig.diceLocked) {
-        const recommended = getRecommendedHP(value);
-        State.updateConfig({ exerciseDie: value, repDie: value, hpThreshold: recommended });
-        // Update rep die UI
-        const repDieInput = container.querySelector(`input[name="repDie"][value="${value}"]`);
-        if (repDieInput) repDieInput.checked = true;
-        // Update HP
-        const hpInput = container.querySelector('#hp-threshold');
-        const hpRec = container.querySelector('.hp-recommendation');
-        if (hpInput) hpInput.value = recommended;
-        if (hpRec) hpRec.textContent = `Recommended: ${recommended}`;
-      } else {
-        State.updateConfig({ exerciseDie: value });
-      }
-    });
-  });
+  // Helper to apply die value with linked sync
+  function applyDieValue(type, value) {
+    const state = State.getState();
+    const recommended = getRecommendedHP(value);
 
-  // Rep die - auto-sets HP, syncs exercise die if locked
-  container.querySelectorAll('input[name="repDie"]').forEach(input => {
-    input.addEventListener('change', () => {
-      const value = parseInt(input.value);
-      const recommended = getRecommendedHP(value);
-      const state = State.getState();
-      if (state.sessionConfig.diceLocked) {
-        State.updateConfig({ exerciseDie: value, repDie: value, hpThreshold: recommended });
-        // Update exercise die UI
-        const exerciseDieInput = container.querySelector(`input[name="exerciseDie"][value="${value}"]`);
-        if (exerciseDieInput) exerciseDieInput.checked = true;
-      } else {
-        State.updateConfig({ repDie: value, hpThreshold: recommended });
-      }
+    if (state.sessionConfig.diceLocked) {
+      State.updateConfig({ exerciseDie: value, repDie: value, hpThreshold: recommended });
+      // Re-render to update both selectors
+      renderSetupScreen(container);
+    } else if (type === 'exercise') {
+      State.updateConfig({ exerciseDie: value });
+    } else {
+      State.updateConfig({ repDie: value, hpThreshold: recommended });
       // Update HP input and recommendation text
       const hpInput = container.querySelector('#hp-threshold');
       const hpRec = container.querySelector('.hp-recommendation');
       if (hpInput) hpInput.value = recommended;
       if (hpRec) hpRec.textContent = `Recommended: ${recommended}`;
+    }
+  }
+
+  // Exercise die radio buttons
+  container.querySelectorAll('input[name="exerciseDie"]').forEach(input => {
+    input.addEventListener('change', () => {
+      if (input.value === 'custom') {
+        // Focus the custom input
+        const customInput = container.querySelector('#exercise-die-custom-input');
+        if (customInput) customInput.focus();
+        return;
+      }
+      applyDieValue('exercise', parseInt(input.value));
     });
   });
+
+  // Exercise die custom input
+  const exerciseCustomInput = container.querySelector('#exercise-die-custom-input');
+  if (exerciseCustomInput) {
+    exerciseCustomInput.addEventListener('input', () => {
+      const customRadio = container.querySelector('#exercise-die-custom');
+      if (customRadio) customRadio.checked = true;
+    });
+    exerciseCustomInput.addEventListener('change', () => {
+      const value = parseInt(exerciseCustomInput.value);
+      if (value && value >= 2) {
+        applyDieValue('exercise', value);
+      }
+    });
+  }
+
+  // Rep die radio buttons
+  container.querySelectorAll('input[name="repDie"]').forEach(input => {
+    input.addEventListener('change', () => {
+      if (input.value === 'custom') {
+        // Focus the custom input
+        const customInput = container.querySelector('#rep-die-custom-input');
+        if (customInput) customInput.focus();
+        return;
+      }
+      applyDieValue('rep', parseInt(input.value));
+    });
+  });
+
+  // Rep die custom input
+  const repCustomInput = container.querySelector('#rep-die-custom-input');
+  if (repCustomInput) {
+    repCustomInput.addEventListener('input', () => {
+      const customRadio = container.querySelector('#rep-die-custom');
+      if (customRadio) customRadio.checked = true;
+    });
+    repCustomInput.addEventListener('change', () => {
+      const value = parseInt(repCustomInput.value);
+      if (value && value >= 2) {
+        applyDieValue('rep', value);
+      }
+    });
+  }
 
   // HP threshold
   const hpInput = container.querySelector('#hp-threshold');
@@ -276,10 +341,13 @@ export function renderRollScreen(container) {
 }
 
 function renderAllAtOnceMode(session, isNewRound) {
+  const isMulticlass = session.config.multiclass && session.config.subclasses.length > 1;
+
   return session.slots.map((slot, index) => {
+    const hasSubclass = slot.subclass !== null;
     const hasExercise = slot.exerciseIndex !== null;
     const hasReps = slot.repRoll !== null;
-    const subclassName = SUBCLASSES[slot.subclass]?.name || slot.subclass;
+    const subclassName = hasSubclass ? (SUBCLASSES[slot.subclass]?.name || slot.subclass) : '???';
 
     return `
       <div class="roll-slot ${hasExercise && hasReps ? 'roll-slot--complete' : ''}">
@@ -294,12 +362,19 @@ function renderAllAtOnceMode(session, isNewRound) {
           ` : `<div class="roll-slot-result text-muted">${subclassName}</div>`}
         </div>
         <div class="roll-controls">
-          ${!isNewRound ? `
-            ${!hasExercise ? `
-              <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
-                     min="1" max="${session.config.exerciseDie}" placeholder="1-${session.config.exerciseDie}">
-              <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
-            ` : ''}
+          ${!isNewRound && isMulticlass && !hasSubclass ? `
+            <select class="roll-select" data-slot="${index}" data-type="subclass">
+              <option value="">Select...</option>
+              ${session.config.subclasses.map(key => `
+                <option value="${key}">${SUBCLASSES[key]?.name || key}</option>
+              `).join('')}
+            </select>
+            <button class="btn btn--small" data-roll-subclass="${index}">Roll<br>Class</button>
+          ` : ''}
+          ${!isNewRound && hasSubclass && !hasExercise ? `
+            <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
+                   min="1" max="${session.config.exerciseDie}" placeholder="1-${session.config.exerciseDie}">
+            <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
           ` : ''}
           ${hasExercise && !hasReps ? `
             <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
@@ -378,10 +453,46 @@ function canEnterWorkout(session, isNewRound) {
     // Just need reps rolled
     return session.slots.every(slot => slot.repRoll !== null);
   }
-  return State.allExercisesRolled() && State.allRepsRolled();
+  // Check subclasses are selected (for multiclass)
+  const allSubclassesSelected = session.slots.every(slot => slot.subclass !== null);
+  return allSubclassesSelected && State.allExercisesRolled() && State.allRepsRolled();
 }
 
 function attachRollListeners(container, session, isNewRound) {
+  // Roll subclass buttons
+  container.querySelectorAll('[data-roll-subclass]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const index = parseInt(btn.dataset.rollSubclass);
+      const select = container.querySelector(`select[data-slot="${index}"][data-type="subclass"]`);
+      const manualValue = select && select.value ? select.value : null;
+
+      // Add animation class
+      btn.classList.add('dice-roll');
+
+      State.rollSubclassForSlot(index, manualValue);
+
+      // Re-render after a brief delay for animation
+      setTimeout(() => {
+        if (window.wyrdForceRender) window.wyrdForceRender();
+      }, 100);
+    });
+  });
+
+  // Subclass select change (auto-apply when selected)
+  container.querySelectorAll('select[data-type="subclass"]').forEach(select => {
+    select.addEventListener('change', () => {
+      if (select.value) {
+        const index = parseInt(select.dataset.slot);
+        State.rollSubclassForSlot(index, select.value);
+
+        // Re-render
+        setTimeout(() => {
+          if (window.wyrdForceRender) window.wyrdForceRender();
+        }, 100);
+      }
+    });
+  });
+
   // Roll exercise buttons
   container.querySelectorAll('[data-roll-exercise]').forEach(btn => {
     btn.addEventListener('click', () => {

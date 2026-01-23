@@ -1,6 +1,6 @@
 // Wyrd Workout - Constants and Data Model
 
-export const DIE_SIZES = [4, 6, 8, 10, 12, 20];
+export const DIE_SIZES = [4, 6, 8, 10, 12, 14, 16, 18, 20];
 
 export const HP_RECOMMENDATIONS = {
   4: 100,
@@ -8,16 +8,35 @@ export const HP_RECOMMENDATIONS = {
   8: 200,
   10: 250,
   12: 300,
+  14: 350,
+  16: 425,
+  18: 475,
   20: 550
 };
 
-// Interpolate HP for any die size
+// Interpolate/extrapolate HP for any die size
 export function getRecommendedHP(dieSize) {
   if (HP_RECOMMENDATIONS[dieSize]) {
     return HP_RECOMMENDATIONS[dieSize];
   }
-  // Linear interpolation for intermediate values
+
   const sizes = Object.keys(HP_RECOMMENDATIONS).map(Number).sort((a, b) => a - b);
+  const minSize = sizes[0];
+  const maxSize = sizes[sizes.length - 1];
+
+  // Extrapolate below minimum
+  if (dieSize < minSize) {
+    const ratio = (HP_RECOMMENDATIONS[sizes[1]] - HP_RECOMMENDATIONS[sizes[0]]) / (sizes[1] - sizes[0]);
+    return Math.max(50, Math.round(HP_RECOMMENDATIONS[minSize] + ratio * (dieSize - minSize)));
+  }
+
+  // Extrapolate above maximum
+  if (dieSize > maxSize) {
+    const ratio = (HP_RECOMMENDATIONS[sizes[sizes.length - 1]] - HP_RECOMMENDATIONS[sizes[sizes.length - 2]]) / (sizes[sizes.length - 1] - sizes[sizes.length - 2]);
+    return Math.round(HP_RECOMMENDATIONS[maxSize] + ratio * (dieSize - maxSize));
+  }
+
+  // Linear interpolation for intermediate values
   for (let i = 0; i < sizes.length - 1; i++) {
     if (dieSize > sizes[i] && dieSize < sizes[i + 1]) {
       const ratio = (dieSize - sizes[i]) / (sizes[i + 1] - sizes[i]);
@@ -27,6 +46,7 @@ export function getRecommendedHP(dieSize) {
       );
     }
   }
+
   return HP_RECOMMENDATIONS[6]; // Default fallback
 }
 
@@ -102,9 +122,53 @@ export const SUBCLASSES = {
     name: 'Barbarian',
     equipment: 'Hammer/Mace',
     exercises: {
-      Push: generatePlaceholderExercises('Hammer Push'),
-      Pull: generatePlaceholderExercises('Hammer Pull'),
-      'Squat/Hinge': generatePlaceholderExercises('Hammer Squat'),
+      Push: [
+        'Hammer Floor Press',
+        'Hammer Vertical Strike',
+        'Hammer Shoulder Press',
+        'Hammer Lateral Raise',
+        'Hammer Single Arm Press',
+        'Hammer Pronated Grip Push Up',
+        'Hammer Head Push Up',
+        'Hammer Grip Push Up',
+        'Hammer Mixed Grip Push Up',
+        'Hammer Push Up to Pass Over',
+        'Hammer Head Side to Side Push Up',
+        'Hammer Push Up to Renegade Row',
+        'Hammer Push Up to T-Raise',
+        'Hammer Grip Side to Side Push Up'
+      ],
+      Pull: [
+        'Hammer Supinated Curl',
+        'Hammer Slams',
+        'Hammer Oared Row',
+        'Hammer Alternating 3 Curl',
+        'Hammer Alternating Rotation',
+        'Hammer Upright Row',
+        'Hammer Cross Body Row',
+        'Hammer Pendulum Swing',
+        'Hammer Alternating Upright Row',
+        'Hammer Rotation Strike',
+        'Hammer Upwards Strike',
+        'Hammer Uppercut Strike',
+        'Hammer Alternating Up Strike',
+        'Hammer Rotation Strike'
+      ],
+      'Squat/Hinge': [
+        'Hammer Deadlift',
+        'Hammer Alternating Deadlift Pass',
+        'Hammer Shouldered Squat',
+        'Hammer Single Leg Deadlift',
+        'Hammer Squat 5',  // TODO: verify - position 5 needs identification
+        'Hammer Front Hold Squat',
+        'Hammer Squat W/ Vertical Strike',
+        'Hammer Snatch',
+        'Hammer Squat W/ Rotation',
+        'Hammer Single Leg Deadlift Clean',
+        'Hammer Strike Squat',
+        'Hammer Alternating Ready Pass Squat',
+        'Hammer Alternating Pass Squat'
+      ],
       Lunge: generatePlaceholderExercises('Hammer Lunge'),
       Core: generatePlaceholderExercises('Hammer Core'),
       Cardio: generatePlaceholderExercises('Hammer Cardio')

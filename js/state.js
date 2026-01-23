@@ -95,8 +95,11 @@ export function createSlots(config) {
 
   for (const templateItem of config.roundTemplate) {
     for (let i = 0; i < templateItem.count; i++) {
-      // Pick random subclass if multiclassing
-      const subclass = config.subclasses[Math.floor(Math.random() * config.subclasses.length)];
+      // If multiclass with multiple subclasses, leave null for user to roll/select
+      // Otherwise, use the single subclass
+      const subclass = (config.multiclass && config.subclasses.length > 1)
+        ? null
+        : config.subclasses[0];
 
       slots.push({
         category: templateItem.category,
@@ -111,6 +114,23 @@ export function createSlots(config) {
   }
 
   return slots;
+}
+
+// Roll or set subclass for a slot (no notify - caller handles re-render)
+export function rollSubclassForSlot(slotIndex, manualValue = null) {
+  if (!session || !session.slots[slotIndex]) return;
+
+  const slot = session.slots[slotIndex];
+  const availableSubclasses = session.config.subclasses;
+
+  // Use manual value or roll randomly
+  if (manualValue !== null && availableSubclasses.includes(manualValue)) {
+    slot.subclass = manualValue;
+  } else {
+    slot.subclass = availableSubclasses[Math.floor(Math.random() * availableSubclasses.length)];
+  }
+
+  saveSession();
 }
 
 // Initialize a new session
@@ -175,6 +195,12 @@ export function rollRepsForSlot(slotIndex, manualValue = null) {
   }
 
   saveSession();
+}
+
+// Check if all slots have subclasses selected
+export function allSubclassesSelected() {
+  if (!session) return false;
+  return session.slots.every(slot => slot.subclass !== null);
 }
 
 // Check if all slots have exercises rolled
