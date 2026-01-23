@@ -356,6 +356,11 @@ export function completeCurrentExercise(customReps = null) {
   const slot = session.slots[session.currentSlotIndex];
   if (!slot || slot.completed) return;
 
+  // Resume timer if it was paused
+  if (!session.timer.running) {
+    resumeTimer();
+  }
+
   // Use custom reps if provided, otherwise use full reps
   const repsCompleted = customReps !== null ? customReps : slot.actualReps;
 
@@ -387,6 +392,11 @@ export function completeCurrentExercise(customReps = null) {
 // Complete entire round
 export function completeRound() {
   if (!session) return;
+
+  // Resume timer if it was paused
+  if (!session.timer.running) {
+    resumeTimer();
+  }
 
   // Complete all remaining slots in current round
   const startIndex = session.currentSlotIndex;
