@@ -76,19 +76,23 @@ function checkSavedSession() {
     if (loaded) {
       const state = State.getState();
 
+      // If workout was already completed, clear and start fresh
+      if (state.session.hpRemaining <= 0) {
+        State.clearSession();
+        lastScreen = 'setup';
+        renderScreen('setup');
+        return;
+      }
+
       // Render setup first as background
       renderScreen('setup');
 
-      // Show resume modal
+      // Show resume modal for in-progress workouts only
       Screens.renderResumeModal(
         app,
         // On resume
         () => {
-          // Determine which screen to show based on session state
-          if (state.session.hpRemaining <= 0) {
-            lastScreen = 'victory';
-            State.setScreen('victory');
-          } else if (!State.allExercisesRolled() || !State.allRepsRolled()) {
+          if (!State.allExercisesRolled() || !State.allRepsRolled()) {
             lastScreen = 'roll';
             State.setScreen('roll');
           } else {

@@ -14,11 +14,17 @@ export function renderSetupScreen(container) {
 
       <div class="screen-content">
         <div class="form-group">
-          <label>Choose Your Class</label>
+          <div class="label-row">
+            <label>Choose Your Class</label>
+            <label class="multiclass-toggle">
+              <input type="checkbox" id="multiclass-toggle" ${config.multiclass ? 'checked' : ''}>
+              <span>Multiclass</span>
+            </label>
+          </div>
           <div class="subclass-grid">
             ${Object.entries(SUBCLASSES).map(([key, subclass]) => `
               <div class="subclass-option">
-                <input type="checkbox"
+                <input type="${config.multiclass ? 'checkbox' : 'radio'}"
                        id="subclass-${key}"
                        name="subclass"
                        value="${key}"
@@ -111,7 +117,24 @@ export function renderSetupScreen(container) {
 }
 
 function attachSetupListeners(container) {
-  // Subclass selection (multi-select)
+  // Multiclass toggle
+  const multiclassToggle = container.querySelector('#multiclass-toggle');
+  if (multiclassToggle) {
+    multiclassToggle.addEventListener('change', () => {
+      const isMulticlass = multiclassToggle.checked;
+      const state = State.getState();
+      // If turning off multiclass, keep only the first selected class
+      if (!isMulticlass && state.sessionConfig.subclasses.length > 1) {
+        State.updateConfig({ multiclass: isMulticlass, subclasses: [state.sessionConfig.subclasses[0]] });
+      } else {
+        State.updateConfig({ multiclass: isMulticlass });
+      }
+      // Re-render to change input types
+      renderSetupScreen(container);
+    });
+  }
+
+  // Subclass selection (works for both radio and checkbox)
   container.querySelectorAll('input[name="subclass"]').forEach(input => {
     input.addEventListener('change', () => {
       const checked = Array.from(container.querySelectorAll('input[name="subclass"]:checked'))
@@ -228,13 +251,13 @@ function renderAllAtOnceMode(session, isNewRound) {
             ${!hasExercise ? `
               <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
                      min="1" max="${session.config.exerciseDie}" placeholder="1-${session.config.exerciseDie}">
-              <button class="btn btn--small" data-roll-exercise="${index}">Exercise</button>
+              <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
             ` : ''}
           ` : ''}
           ${hasExercise && !hasReps ? `
             <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
                    min="1" max="${session.config.repDie}" placeholder="1-${session.config.repDie}">
-            <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Reps</button>
+            <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
           ` : ''}
         </div>
       </div>
@@ -290,7 +313,7 @@ function renderRevealMode(session) {
             ${!hasExercise ? `
               <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
                      min="1" max="${session.config.exerciseDie}" placeholder="1-${session.config.exerciseDie}">
-              <button class="btn btn--small" data-roll-exercise="${index}">Exercise</button>
+              <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
             ` : !hasReps ? `
               <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
                      min="1" max="${session.config.repDie}" placeholder="1-${session.config.repDie}">

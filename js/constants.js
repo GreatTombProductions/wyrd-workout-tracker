@@ -255,6 +255,7 @@ export const DEFAULT_ROUND_TEMPLATE = [
 // Default session configuration
 export const DEFAULT_SESSION_CONFIG = {
   subclasses: ['ranger'],
+  multiclass: false,
   exerciseDie: 6,
   repDie: 6,
   hpThreshold: 150,
