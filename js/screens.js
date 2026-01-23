@@ -55,9 +55,10 @@ export function renderSetupScreen(container) {
         </div>
 
         <div class="die-link-row">
-          <button type="button" class="die-link-btn ${config.diceLocked ? 'die-link-btn--active' : ''}" id="dice-link-toggle" title="${config.diceLocked ? 'Unlink dice' : 'Link dice'}">
+          <button type="button" class="die-link-btn ${config.diceLocked ? 'die-link-btn--active' : ''}" id="dice-link-toggle">
             ${config.diceLocked ? '&#x1F517;' : '&#x26D3;'}
           </button>
+          <span class="die-link-label">${config.diceLocked ? 'Linked' : 'Unlinked'}</span>
         </div>
 
         <div class="form-group">

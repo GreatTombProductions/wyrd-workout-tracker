@@ -152,9 +152,9 @@ h3 {
 .btn--small {
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: 0.625rem;
-  width: 64px;
-  min-width: 64px;
-  max-width: 64px;
+  width: 72px;
+  min-width: 72px;
+  max-width: 72px;
   line-height: 1.2;
   letter-spacing: 0.05em;
   flex-shrink: 0;
@@ -352,7 +352,16 @@ input[type="text"]:focus {
 .die-link-row {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: var(--spacing-sm);
   margin: calc(var(--spacing-sm) * -1) 0;
+}
+
+.die-link-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .die-link-btn {
