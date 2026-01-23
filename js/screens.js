@@ -47,7 +47,7 @@ export function renderSetupScreen(container) {
                        id="exercise-die-${size}"
                        name="exerciseDie"
                        value="${size}"
-                       ${config.exerciseDie === size && DIE_SIZES.includes(config.exerciseDie) ? 'checked' : ''}>
+                       ${config.exerciseDie === size ? 'checked' : ''}>
                 <label for="exercise-die-${size}">D${size}</label>
               </div>
             `).join('')}
@@ -57,14 +57,7 @@ export function renderSetupScreen(container) {
                      name="exerciseDie"
                      value="custom"
                      ${!DIE_SIZES.includes(config.exerciseDie) ? 'checked' : ''}>
-              <label for="exercise-die-custom">D</label>
-              <input type="number"
-                     id="exercise-die-custom-input"
-                     class="die-custom-input"
-                     min="2"
-                     max="100"
-                     value="${!DIE_SIZES.includes(config.exerciseDie) ? config.exerciseDie : ''}"
-                     placeholder="?">
+              <label for="exercise-die-custom" id="exercise-die-custom-label">D${!DIE_SIZES.includes(config.exerciseDie) ? config.exerciseDie : '?'}</label>
             </div>
           </div>
           <div class="die-guide">Beginner: D4–D6 · Intermediate: D6–D20 · Advanced: D20</div>
@@ -86,7 +79,7 @@ export function renderSetupScreen(container) {
                        id="rep-die-${size}"
                        name="repDie"
                        value="${size}"
-                       ${config.repDie === size && DIE_SIZES.includes(config.repDie) ? 'checked' : ''}>
+                       ${config.repDie === size ? 'checked' : ''}>
                 <label for="rep-die-${size}">D${size}</label>
               </div>
             `).join('')}
@@ -96,14 +89,7 @@ export function renderSetupScreen(container) {
                      name="repDie"
                      value="custom"
                      ${!DIE_SIZES.includes(config.repDie) ? 'checked' : ''}>
-              <label for="rep-die-custom">D</label>
-              <input type="number"
-                     id="rep-die-custom-input"
-                     class="die-custom-input"
-                     min="2"
-                     max="100"
-                     value="${!DIE_SIZES.includes(config.repDie) ? config.repDie : ''}"
-                     placeholder="?">
+              <label for="rep-die-custom" id="rep-die-custom-label">D${!DIE_SIZES.includes(config.repDie) ? config.repDie : '?'}</label>
             </div>
           </div>
           <div class="die-guide">Beginner: D4–D6 · Intermediate: D8–D12 · Advanced: D12–D20</div>
@@ -194,14 +180,49 @@ function attachSetupListeners(container) {
       const state = State.getState();
       const newLocked = !state.sessionConfig.diceLocked;
       State.updateConfig({ diceLocked: newLocked });
+      // Update button appearance
+      diceLinkBtn.classList.toggle('die-link-btn--active', newLocked);
+      diceLinkBtn.innerHTML = newLocked ? '&#x1F517;' : '&#x26D3;';
+      const linkLabel = container.querySelector('.die-link-label');
+      if (linkLabel) linkLabel.textContent = newLocked ? 'Linked' : 'Unlinked';
       // If locking, sync rep die to exercise die
       if (newLocked) {
         const exerciseDie = state.sessionConfig.exerciseDie;
         const recommended = getRecommendedHP(exerciseDie);
         State.updateConfig({ repDie: exerciseDie, hpThreshold: recommended });
+        updateDieUI('rep', exerciseDie);
+        updateHPUI(recommended);
       }
-      renderSetupScreen(container);
     });
+  }
+
+  // Helper to update die selector UI without re-render
+  function updateDieUI(type, value) {
+    const isCustom = !DIE_SIZES.includes(value);
+    // Uncheck all
+    container.querySelectorAll(`input[name="${type === 'exercise' ? 'exerciseDie' : 'repDie'}"]`).forEach(input => {
+      input.checked = false;
+    });
+    if (isCustom) {
+      const customRadio = container.querySelector(`#${type}-die-custom`);
+      const customLabel = container.querySelector(`#${type}-die-custom-label`);
+      if (customRadio) customRadio.checked = true;
+      if (customLabel) customLabel.textContent = `D${value}`;
+    } else {
+      const radio = container.querySelector(`#${type}-die-${value}`);
+      if (radio) radio.checked = true;
+      // Reset custom label
+      const customLabel = container.querySelector(`#${type}-die-custom-label`);
+      if (customLabel) customLabel.textContent = 'D?';
+    }
+  }
+
+  // Helper to update HP UI
+  function updateHPUI(recommended) {
+    const hpInput = container.querySelector('#hp-threshold');
+    const hpRec = container.querySelector('.hp-recommendation');
+    if (hpInput) hpInput.value = recommended;
+    if (hpRec) hpRec.textContent = `Recommended: ${recommended}`;
   }
 
   // Helper to apply die value with linked sync
@@ -211,75 +232,94 @@ function attachSetupListeners(container) {
 
     if (state.sessionConfig.diceLocked) {
       State.updateConfig({ exerciseDie: value, repDie: value, hpThreshold: recommended });
-      // Re-render to update both selectors
-      renderSetupScreen(container);
+      // Update both die selectors
+      updateDieUI('exercise', value);
+      updateDieUI('rep', value);
+      updateHPUI(recommended);
     } else if (type === 'exercise') {
       State.updateConfig({ exerciseDie: value });
+      updateDieUI('exercise', value);
     } else {
       State.updateConfig({ repDie: value, hpThreshold: recommended });
-      // Update HP input and recommendation text
-      const hpInput = container.querySelector('#hp-threshold');
-      const hpRec = container.querySelector('.hp-recommendation');
-      if (hpInput) hpInput.value = recommended;
-      if (hpRec) hpRec.textContent = `Recommended: ${recommended}`;
+      updateDieUI('rep', value);
+      updateHPUI(recommended);
     }
+  }
+
+  // Show custom die modal
+  function showCustomDieModal(type) {
+    const state = State.getState();
+    const currentValue = type === 'exercise' ? state.sessionConfig.exerciseDie : state.sessionConfig.repDie;
+    const initialValue = DIE_SIZES.includes(currentValue) ? '' : currentValue;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <h2>Custom Die</h2>
+        <div class="modal-input-group">
+          <label>D</label>
+          <input type="number" id="custom-die-input" min="2" max="100" value="${initialValue}" placeholder="?">
+        </div>
+        <div class="modal-buttons">
+          <button class="btn btn--full" id="custom-die-confirm">Confirm</button>
+          <button class="btn btn--full btn--secondary" id="custom-die-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(overlay);
+
+    const input = overlay.querySelector('#custom-die-input');
+    input.focus();
+    input.select();
+
+    const confirm = () => {
+      const value = parseInt(input.value);
+      if (value && value >= 2) {
+        applyDieValue(type, value);
+      }
+      overlay.remove();
+    };
+
+    overlay.querySelector('#custom-die-confirm').addEventListener('click', confirm);
+    overlay.querySelector('#custom-die-cancel').addEventListener('click', () => overlay.remove());
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') confirm();
+      if (e.key === 'Escape') overlay.remove();
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
   }
 
   // Exercise die radio buttons
   container.querySelectorAll('input[name="exerciseDie"]').forEach(input => {
     input.addEventListener('change', () => {
       if (input.value === 'custom') {
-        // Focus the custom input
-        const customInput = container.querySelector('#exercise-die-custom-input');
-        if (customInput) customInput.focus();
+        showCustomDieModal('exercise');
+        // Revert to previous selection until modal confirms
+        const state = State.getState();
+        updateDieUI('exercise', state.sessionConfig.exerciseDie);
         return;
       }
       applyDieValue('exercise', parseInt(input.value));
     });
   });
 
-  // Exercise die custom input
-  const exerciseCustomInput = container.querySelector('#exercise-die-custom-input');
-  if (exerciseCustomInput) {
-    exerciseCustomInput.addEventListener('input', () => {
-      const customRadio = container.querySelector('#exercise-die-custom');
-      if (customRadio) customRadio.checked = true;
-    });
-    exerciseCustomInput.addEventListener('change', () => {
-      const value = parseInt(exerciseCustomInput.value);
-      if (value && value >= 2) {
-        applyDieValue('exercise', value);
-      }
-    });
-  }
-
   // Rep die radio buttons
   container.querySelectorAll('input[name="repDie"]').forEach(input => {
     input.addEventListener('change', () => {
       if (input.value === 'custom') {
-        // Focus the custom input
-        const customInput = container.querySelector('#rep-die-custom-input');
-        if (customInput) customInput.focus();
+        showCustomDieModal('rep');
+        // Revert to previous selection until modal confirms
+        const state = State.getState();
+        updateDieUI('rep', state.sessionConfig.repDie);
         return;
       }
       applyDieValue('rep', parseInt(input.value));
     });
   });
-
-  // Rep die custom input
-  const repCustomInput = container.querySelector('#rep-die-custom-input');
-  if (repCustomInput) {
-    repCustomInput.addEventListener('input', () => {
-      const customRadio = container.querySelector('#rep-die-custom');
-      if (customRadio) customRadio.checked = true;
-    });
-    repCustomInput.addEventListener('change', () => {
-      const value = parseInt(repCustomInput.value);
-      if (value && value >= 2) {
-        applyDieValue('rep', value);
-      }
-    });
-  }
 
   // HP threshold
   const hpInput = container.querySelector('#hp-threshold');

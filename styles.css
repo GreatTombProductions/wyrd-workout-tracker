@@ -316,7 +316,7 @@ input[type="text"]:focus {
   display: flex;
   gap: var(--spacing-xs);
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .die-option {
@@ -352,48 +352,13 @@ input[type="text"]:focus {
 
 /* Custom die option */
 .die-option--custom {
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  /* Same as regular die-option, no special layout */
 }
 
 .die-option--custom label {
+  min-width: 38px;
   width: auto;
-  height: 38px;
   padding: 0 var(--spacing-xs);
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  border-right: none;
-}
-
-.die-custom-input {
-  width: 36px;
-  min-width: 36px;
-  height: 38px;
-  padding: var(--spacing-xs);
-  font-family: var(--font-display);
-  font-size: 0.75rem;
-  text-align: center;
-  border: 2px solid var(--border-color);
-  border-radius: 4px;
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  background: var(--bg-dark);
-  color: var(--text-primary);
-}
-
-.die-custom-input:focus {
-  outline: none;
-  border-color: var(--accent-burgundy);
-}
-
-.die-option--custom input[type="radio"]:checked + label {
-  background: var(--accent-burgundy);
-  border-color: var(--accent-burgundy-light);
-}
-
-.die-option--custom input[type="radio"]:checked ~ .die-custom-input {
-  border-color: var(--accent-burgundy-light);
 }
 
 /* Die difficulty guide */
@@ -794,6 +759,26 @@ input[type="text"]:focus {
   gap: var(--spacing-sm);
 }
 
+.modal-input-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.modal-input-group label {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.modal-input-group input {
+  width: 80px;
+  font-size: 1.25rem;
+  text-align: center;
+}
+
 /* Utility classes */
 .text-center { text-align: center; }
 .mt-auto { margin-top: auto; }
@@ -865,7 +850,7 @@ input[type="text"]:focus {
   }
 
   .die-selector {
-    justify-content: center;
+    justify-content: flex-start;
     gap: 4px;
   }
 
@@ -873,12 +858,6 @@ input[type="text"]:focus {
     width: 36px;
     height: 36px;
     font-size: 0.75rem;
-  }
-
-  .die-custom-input {
-    width: 32px;
-    min-width: 32px;
-    height: 36px;
   }
 }
 
