@@ -54,6 +54,12 @@ export function renderSetupScreen(container) {
           </div>
         </div>
 
+        <div class="die-link-row">
+          <button type="button" class="die-link-btn ${config.diceLocked ? 'die-link-btn--active' : ''}" id="dice-link-toggle" title="${config.diceLocked ? 'Unlink dice' : 'Link dice'}">
+            ${config.diceLocked ? '&#x1F517;' : '&#x26D3;'}
+          </button>
+        </div>
+
         <div class="form-group">
           <label>Rep Die</label>
           <div class="die-selector">
@@ -148,20 +154,59 @@ function attachSetupListeners(container) {
     });
   });
 
-  // Exercise die
+  // Dice link toggle
+  const diceLinkBtn = container.querySelector('#dice-link-toggle');
+  if (diceLinkBtn) {
+    diceLinkBtn.addEventListener('click', () => {
+      const state = State.getState();
+      const newLocked = !state.sessionConfig.diceLocked;
+      State.updateConfig({ diceLocked: newLocked });
+      // If locking, sync rep die to exercise die
+      if (newLocked) {
+        const exerciseDie = state.sessionConfig.exerciseDie;
+        const recommended = getRecommendedHP(exerciseDie);
+        State.updateConfig({ repDie: exerciseDie, hpThreshold: recommended });
+      }
+      renderSetupScreen(container);
+    });
+  }
+
+  // Exercise die - syncs rep die if locked
   container.querySelectorAll('input[name="exerciseDie"]').forEach(input => {
     input.addEventListener('change', () => {
       const value = parseInt(input.value);
-      State.updateConfig({ exerciseDie: value });
+      const state = State.getState();
+      if (state.sessionConfig.diceLocked) {
+        const recommended = getRecommendedHP(value);
+        State.updateConfig({ exerciseDie: value, repDie: value, hpThreshold: recommended });
+        // Update rep die UI
+        const repDieInput = container.querySelector(`input[name="repDie"][value="${value}"]`);
+        if (repDieInput) repDieInput.checked = true;
+        // Update HP
+        const hpInput = container.querySelector('#hp-threshold');
+        const hpRec = container.querySelector('.hp-recommendation');
+        if (hpInput) hpInput.value = recommended;
+        if (hpRec) hpRec.textContent = `Recommended: ${recommended}`;
+      } else {
+        State.updateConfig({ exerciseDie: value });
+      }
     });
   });
 
-  // Rep die - auto-sets HP to recommended value
+  // Rep die - auto-sets HP, syncs exercise die if locked
   container.querySelectorAll('input[name="repDie"]').forEach(input => {
     input.addEventListener('change', () => {
       const value = parseInt(input.value);
       const recommended = getRecommendedHP(value);
-      State.updateConfig({ repDie: value, hpThreshold: recommended });
+      const state = State.getState();
+      if (state.sessionConfig.diceLocked) {
+        State.updateConfig({ exerciseDie: value, repDie: value, hpThreshold: recommended });
+        // Update exercise die UI
+        const exerciseDieInput = container.querySelector(`input[name="exerciseDie"][value="${value}"]`);
+        if (exerciseDieInput) exerciseDieInput.checked = true;
+      } else {
+        State.updateConfig({ repDie: value, hpThreshold: recommended });
+      }
       // Update HP input and recommendation text
       const hpInput = container.querySelector('#hp-threshold');
       const hpRec = container.querySelector('.hp-recommendation');

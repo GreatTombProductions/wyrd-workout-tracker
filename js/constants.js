@@ -258,11 +258,15 @@ export const DEFAULT_SESSION_CONFIG = {
   multiclass: false,
   exerciseDie: 6,
   repDie: 6,
+  diceLocked: true,
   hpThreshold: 150,
   roundTemplate: DEFAULT_ROUND_TEMPLATE,
   rollMode: 'all-at-once',
   repMode: 'fixed'
 };
+
+// Storage key for user preferences (persisted across sessions)
+export const PREFS_STORAGE_KEY = 'wyrd-workout-prefs';
 
 // Storage key for localStorage
 export const STORAGE_KEY = 'wyrd-workout-session';

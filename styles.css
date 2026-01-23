@@ -152,9 +152,12 @@ h3 {
 .btn--small {
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: 0.625rem;
+  width: 64px;
   min-width: 64px;
+  max-width: 64px;
   line-height: 1.2;
   letter-spacing: 0.05em;
+  flex-shrink: 0;
 }
 
 .btn--full {
@@ -343,6 +346,38 @@ input[type="text"]:focus {
 .die-option input:checked + label {
   background: var(--accent-burgundy);
   border-color: var(--accent-burgundy-light);
+}
+
+/* Dice link button */
+.die-link-row {
+  display: flex;
+  justify-content: center;
+  margin: calc(var(--spacing-sm) * -1) 0;
+}
+
+.die-link-btn {
+  background: var(--bg-dark);
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: var(--text-muted);
+}
+
+.die-link-btn:hover {
+  border-color: var(--accent-burgundy);
+}
+
+.die-link-btn--active {
+  background: var(--accent-burgundy);
+  border-color: var(--accent-burgundy-light);
+  color: var(--text-primary);
 }
 
 /* HP Input */

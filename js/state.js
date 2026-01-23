@@ -1,12 +1,42 @@
 // Wyrd Workout - State Management
 
-import { STORAGE_KEY, DEFAULT_SESSION_CONFIG, SUBCLASSES } from './constants.js';
+import { STORAGE_KEY, DEFAULT_SESSION_CONFIG, SUBCLASSES, PREFS_STORAGE_KEY } from './constants.js';
 
 // App state
 let currentScreen = 'setup'; // 'setup' | 'roll' | 'workout' | 'victory'
 let sessionConfig = { ...DEFAULT_SESSION_CONFIG };
 let session = null;
 let listeners = [];
+
+// Load saved preferences on init
+function loadPreferences() {
+  const saved = localStorage.getItem(PREFS_STORAGE_KEY);
+  if (saved) {
+    try {
+      const prefs = JSON.parse(saved);
+      sessionConfig = { ...DEFAULT_SESSION_CONFIG, ...prefs };
+    } catch (e) {
+      console.error('Failed to load preferences:', e);
+    }
+  }
+}
+
+// Save preferences to localStorage
+function savePreferences() {
+  const prefs = {
+    subclasses: sessionConfig.subclasses,
+    multiclass: sessionConfig.multiclass,
+    exerciseDie: sessionConfig.exerciseDie,
+    repDie: sessionConfig.repDie,
+    diceLocked: sessionConfig.diceLocked,
+    hpThreshold: sessionConfig.hpThreshold,
+    repMode: sessionConfig.repMode
+  };
+  localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+}
+
+// Initialize preferences
+loadPreferences();
 
 // Subscribe to state changes
 export function subscribe(listener) {
@@ -39,6 +69,7 @@ export function setScreen(screen) {
 // Update session config (no notify - setup screen handles its own state)
 export function updateConfig(updates) {
   sessionConfig = { ...sessionConfig, ...updates };
+  savePreferences();
 }
 
 // Roll a die
