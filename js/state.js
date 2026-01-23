@@ -502,6 +502,12 @@ export function loadSession() {
     try {
       session = JSON.parse(saved);
       sessionConfig = session.config;
+      // Pause timer on load to prevent accumulating time while page was closed
+      // User must explicitly resume, which will set lastTick to current time
+      if (session.timer) {
+        session.timer.running = false;
+        session.timer.lastTick = null;
+      }
       return true;
     } catch (e) {
       console.error('Failed to load session:', e);
