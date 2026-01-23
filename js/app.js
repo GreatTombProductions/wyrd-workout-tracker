@@ -105,13 +105,11 @@ function checkSavedSession() {
         () => {
           // Resume timer from where it left off
           State.resumeTimer();
-          lastScreen = 'workout';
           State.setScreen('workout');
         },
         // On abandon
         () => {
           State.clearSession();
-          lastScreen = 'setup';
           State.setScreen('setup');
         }
       );
