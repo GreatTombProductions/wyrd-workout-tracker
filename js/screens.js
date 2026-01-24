@@ -1459,42 +1459,47 @@ export function renderVictoryScreen(container) {
 
   container.innerHTML = `
     <div class="screen">
-      <h1 class="victory-title">The Encounter Ends</h1>
+      <div id="victory-capture" class="victory-capture">
+        <h1 class="victory-title">The Encounter Ends</h1>
 
-      <div class="screen-content">
-        <div class="victory-stats">
-          <div class="victory-stat">
-            <div class="victory-stat-value">${stats.totalTime}</div>
-            <div class="victory-stat-label">Time</div>
-          </div>
-          <div class="victory-stat">
-            <div class="victory-stat-value">${stats.totalRounds}</div>
-            <div class="victory-stat-label">Rounds</div>
-          </div>
-          <div class="victory-stat">
-            <div class="victory-stat-value">${stats.totalReps}</div>
-            <div class="victory-stat-label">Reps</div>
-          </div>
-        </div>
-
-        <div class="victory-history">
-          ${Object.entries(exercisesByRound).map(([round, exercises]) => `
-            <div class="victory-round">
-              <div class="victory-round-header">Round ${round}</div>
-              <div class="victory-exercises">
-                ${exercises.map(ex => `
-                  <div class="victory-exercise">
-                    <span class="victory-exercise-name">${ex.exerciseName}</span>
-                    <span class="victory-exercise-reps">× ${ex.reps}</span>
-                  </div>
-                `).join('')}
-              </div>
+        <div class="screen-content">
+          <div class="victory-stats">
+            <div class="victory-stat">
+              <div class="victory-stat-value">${stats.totalTime}</div>
+              <div class="victory-stat-label">Time</div>
             </div>
-          `).join('')}
+            <div class="victory-stat">
+              <div class="victory-stat-value">${stats.totalRounds}</div>
+              <div class="victory-stat-label">Rounds</div>
+            </div>
+            <div class="victory-stat">
+              <div class="victory-stat-value">${stats.totalReps}</div>
+              <div class="victory-stat-label">Reps</div>
+            </div>
+          </div>
+
+          <div class="victory-history">
+            ${Object.entries(exercisesByRound).map(([round, exercises]) => `
+              <div class="victory-round">
+                <div class="victory-round-header">Round ${round}</div>
+                <div class="victory-exercises">
+                  ${exercises.map(ex => `
+                    <div class="victory-exercise">
+                      <span class="victory-exercise-name">${ex.exerciseName}</span>
+                      <span class="victory-exercise-reps">× ${ex.reps}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
         </div>
+
+        <div class="victory-branding">Worldtree Workout</div>
       </div>
 
       <div class="screen-footer">
+        <button class="btn btn--secondary btn--full" id="download-summary">Download Summary</button>
         <button class="btn btn--full" id="new-workout">New Workout</button>
       </div>
     </div>
@@ -1505,6 +1510,37 @@ export function renderVictoryScreen(container) {
     newBtn.addEventListener('click', () => {
       State.clearSession();
       State.setScreen('setup');
+    });
+  }
+
+  const downloadBtn = container.querySelector('#download-summary');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', async () => {
+      const captureElement = container.querySelector('#victory-capture');
+      if (!captureElement || typeof html2canvas === 'undefined') return;
+
+      downloadBtn.disabled = true;
+      downloadBtn.textContent = 'Generating...';
+
+      try {
+        const canvas = await html2canvas(captureElement, {
+          backgroundColor: '#2a2520',
+          scale: 2,
+          logging: false,
+          useCORS: true
+        });
+
+        const link = document.createElement('a');
+        const date = new Date().toISOString().split('T')[0];
+        link.download = `workout-summary-${date}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } catch (err) {
+        console.error('Failed to generate image:', err);
+      } finally {
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = 'Download Summary';
+      }
     });
   }
 }
