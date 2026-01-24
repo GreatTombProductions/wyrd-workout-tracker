@@ -1534,29 +1534,36 @@ export function renderVictoryScreen(container) {
         const filename = `workout-summary-${date}.png`;
 
         // Try Web Share API for mobile devices
+        let shared = false;
         if (navigator.canShare && navigator.share) {
-          const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-          const file = new File([blob], filename, { type: 'image/png' });
+          try {
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            const file = new File([blob], filename, { type: 'image/png' });
 
-          if (navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: 'Worldtree Workout Summary'
-            });
-            return;
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: 'Worldtree Workout Summary'
+              });
+              shared = true;
+            }
+          } catch (shareErr) {
+            // User cancelled or share failed - fall through to download
+            if (shareErr.name === 'AbortError') {
+              shared = true; // User cancelled, don't download
+            }
           }
         }
 
-        // Fall back to download for desktop
-        const link = document.createElement('a');
-        link.download = filename;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      } catch (err) {
-        // User cancelled share or error occurred - ignore AbortError from cancel
-        if (err.name !== 'AbortError') {
-          console.error('Failed to generate/share image:', err);
+        // Fall back to download
+        if (!shared) {
+          const link = document.createElement('a');
+          link.download = filename;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
         }
+      } catch (err) {
+        console.error('Failed to generate image:', err);
       } finally {
         downloadBtn.disabled = false;
         downloadBtn.textContent = 'Download Summary';
