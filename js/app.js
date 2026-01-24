@@ -85,7 +85,7 @@ function checkSavedSession() {
       }
 
       // Only show resume modal if the user actually started the workout
-      // (clicked "Enter the Grounds" which starts the timer)
+      // (clicked "Begin Encounter" which starts the timer)
       const timerWasStarted = state.session.timer.running || state.session.timer.elapsed > 0;
       if (!timerWasStarted) {
         // User never entered the workout, clear and start fresh

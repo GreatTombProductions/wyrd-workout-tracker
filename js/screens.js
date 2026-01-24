@@ -154,7 +154,7 @@ export function renderSetupScreen(container) {
       </div>
 
       <div class="screen-footer">
-        <button class="btn btn--full" id="begin-workout">Begin Workout</button>
+        <button class="btn btn--full" id="begin-workout">Roll Workout</button>
       </div>
     </div>
   `;
@@ -413,7 +413,7 @@ export function renderRollScreen(container) {
   container.innerHTML = `
     <div class="screen">
       <h1>${isNewRound ? `Round ${session.currentRound}` : 'Roll Your Fate'}</h1>
-      ${!isNewRound ? '<p class="roll-subheader">Use inputs for physical dice</p>' : ''}
+      ${!isNewRound ? '<p class="roll-subheader">Use inputs for physical dice (reps will be roll + die sides)</p>' : ''}
 
       <div class="screen-content">
         ${renderAllAtOnceMode(session, isNewRound)}
@@ -423,7 +423,7 @@ export function renderRollScreen(container) {
         <button class="btn btn--full btn--secondary mb-md"
                 id="enter-workout"
                 ${!canEnterWorkout(session, isNewRound) ? 'disabled' : ''}>
-          Enter the Grounds
+          Begin Encounter
         </button>
         ${!isNewRound ? `
           <button class="btn btn--full btn--danger" id="back-to-setup">
