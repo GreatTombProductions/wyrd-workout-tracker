@@ -101,7 +101,7 @@ export const SUBCLASSES = {
         'Bodyweight Ring Push Up',
         'Bodyweight Ring Skull Crusher',
         'Bodyweight Ring Chest Flys',
-        'Bodyweight Ring Shoulder Press'
+        'Bodyweight Dive Bomber Push Up'
       ],
       Pull: [
         'Bodyweight Dead Hangs',
@@ -109,8 +109,8 @@ export const SUBCLASSES = {
         'Bodyweight Ring Pronated Row',
         'Bodyweight Ring Supinated Row',
         'Bodyweight Ring Mixed Grip Row',
-        'Pull Up Shrug',
         'Bodyweight Ring Reverse Fly',
+        'Scapular Pull Up',
         'Bodyweight Ring Face Curls',
         'Bodyweight Ring Face Pulls',
         'Bodyweight Chin Ups',
@@ -123,10 +123,10 @@ export const SUBCLASSES = {
         'Bodyweight Single RDL',
         'Bodyweight Cardio Ski Squats',
         'Bodyweight Squat with Diagonal Punch', 
-        'Bodyweight Squat With Rotation Jump', 
+        'Bodyweight Squat with Rotation Jump', 
         'Bodyweight Squat Duck Unders',
         'Bodyweight Hammar Squat',
-        'Bodyweight Squat With Knee Strike',
+        'Bodyweight Squat with Knee Strike',
         'Bodyweight Split Squat',
         'Bodyweight Single RDL with Knee Strike', 
         'Bodyweight Squat Jumps'
@@ -186,12 +186,12 @@ export const SUBCLASSES = {
       ],
       'Squat/Hinge': [
         'Hammer Deadlift',
-        'Hammer Alternating Deadlift pass',
+        'Hammer Alternating Deadlift Pass',
         'Hammer Shouldered Squat',
         'Hammer Single Leg Deadlift',
         'Hammer Single Leg Deadlift Clean',
         'Hammer Front Hold Squat',
-        'Hammer Squat W/ Vertical Strike',
+        'Hammer Squat w/ Vertical Strike',
         'Hammer Snatch',
         'Hammer Squat w/ rotation',
         'Hammer Single Leg Deadlift Clean',
@@ -216,8 +216,8 @@ export const SUBCLASSES = {
         'Hammer Front Hold Side Lunge',
         'Hammer Strike Reverse Lunge',
         'Hammer Strike Forward Lunge',
-        'Hammer Reverse Lunge w/ rotation',
-        'Hammer Forward Lunge w/ rotation',
+        'Hammer Reverse Lunge w/ Rotation',
+        'Hammer Forward Lunge w/ Rotation',
         'Hammer Reverse Lunge w/ Vertical Strike',
         'Hammer Forward Lunge w/ Vertical Strike'
       ],
@@ -252,6 +252,8 @@ export const SUBCLASSES = {
         'Single Dumbbell Oared Row',
         'Single Dumbbell Alternating Bent Over Row Catch',
         'Single Dumbbell High Row',
+        'Single Dumbbell Alternating Reverse Fly',
+        'Single Dumbbell Alternating Lateral Raise',
         'Single Dumbbell Alternating Snatch'
       ],
       'Squat/Hinge': [
@@ -278,7 +280,9 @@ export const SUBCLASSES = {
         'Single Dumbbell Loot Carry Forward Lunge w/ Rotation',
         'Single Dumbbell Loot Carry Reverse Lunge w/ Rotation',
         'Single Dumbbell Reverse Lunge w/ Knee Strike',
-        'Single Dumbbell Forward Lunge w/ Knee Strike'
+        'Single Dumbbell Forward Lunge w/ Knee Strike',
+        'Single Dumbbell Overhead Reverse Lunge',
+        'Single Dumbbell Overhead Forward Lunge'
       ],
       Core: SHARED_CORE_EXERCISES
     }
@@ -353,14 +357,18 @@ export const SUBCLASSES = {
     equipment: 'Weight Plate',
     exercises: {
       Push: [
+        'Shield Chest Bash',
         'Shield Overhead Press',
         'Shield Overhead Tricep Extension',
         'Shield Ship Turners',
+        'Shield Side Raise',
         'Shield Rotation Bash',
         'Shield Diagonal Bash',
+        'Shield Single Arm Shoulder Press',
         'Shield Push Ups',
         'Shield Side to Side Push Ups',
-        'Shield Weighted Push Up'
+        'Shield Weighted Push Up',
+        'Shield Plate to Ground Push Up'
       ],
       Pull: [
         'Shield Bent Over Row',
@@ -383,9 +391,11 @@ export const SUBCLASSES = {
         'Shield Full Swing',
         'Shield Hip Thrust',
         'Shield Hold Squat',
+        'Shield Single Leg RDL',
+        'Shield Back Rack Single Leg RDL',
         'Shield Ground to Overhead',
-        'Shield Squat w_Knee strike',
-        'Shield Squat W/ twist hop',
+        'Shield Squat w/ Knee Strike',
+        'Shield Squat w/ Twist Hop',
         'Shield Thruster'
       ],
       Lunge: [
@@ -410,47 +420,61 @@ export const SUBCLASSES = {
     equipment: 'Kettlebell',
     exercises: {
       Push: [
-        'KB Floor Press', 'KB Bench Press', 'Single KB Floor Press', 'KB Push Press',
-        'KB Strict Press', 'KB Arnold Press', 'KB Seesaw Press', 'KB Bottom-up Press',
-        'KB Crush Press', 'KB Fly', 'KB Skull Crusher', 'KB Dip',
-        'KB Push-up', 'KB Diamond Push-up', 'KB Archer Push-up', 'KB Thruster',
-        'Double KB Thruster', 'KB Jerk', 'Double KB Jerk', 'KB Long Cycle'
+        'Kettlebell Floor Press', 
+        'Kettlebell Seated Overhead Tricep Extension',
+        'Kettlebell Crusher Grip Push Up',
+        'Kettlebell Single Arm Press',
+        'Kettlebell Power Clean and Press',
+        'Kettlebell Skull Crusher',
+        'Kettlebell Push Press',
+        'Kettlebell Kneeling Press',
+        'Kettlebell Seated Press',
+        'Kettlebell Push Up',
+        'Kettlebell Push Up w/ Pass Through',
+        'Kettlebell Lift Off Push Up'
       ],
       Pull: [
-        'KB Row', 'Single Arm KB Row', 'KB Gorilla Row', 'KB High Pull',
-        'KB Upright Row', 'KB Shrug', 'KB Reverse Fly', 'KB Face Pull',
-        'KB Curl', 'KB Hammer Curl', 'KB Clean', 'Double KB Clean',
-        'KB Snatch', 'KB Dead Clean', 'KB Renegade Row', 'KB Rotational Row',
-        'KB Pullover', 'KB Around the World', 'KB Figure 8', 'KB Muscle Snatch'
+        'Kettlebell Pull Over',
+        'Kettlebell Crusher Grip Curl',
+        'Kettlebell Hammer Curl',
+        'Kettlebell Face Curl Swing',
+        'Kettlebell High Row',
+        'Kettlebell Oared Row',
+        'Kettlebell Crusher Grip Row',
+        'Kettlebell Alternating Bent Over Row',
+        'Kettlebell Single Arm High Row',
+        'Kettlebell Kneeling High Row',
+        'Kettlebell Single Arm Power Clean',
+        'Kettlebell Single Arm Snatch'
       ],
       'Squat/Hinge': [
-        'KB Goblet Squat', 'KB Front Squat', 'Double KB Front Squat', 'KB Sumo Squat',
-        'KB Deadlift', 'KB Swing', 'KB Single Arm Swing', 'KB Russian Swing',
-        'KB American Swing', 'KB RDL', 'KB Single Leg RDL', 'KB Clean and Squat',
-        'KB Snatch', 'KB Pistol Squat', 'KB Cossack Squat', 'KB Jump Squat',
-        'Double KB Swing', 'KB Swing to Squat', 'KB Dead Snatch', 'KB Squat Snatch'
+        'Kettlebell Crusher Grip Thruster',
+        'Kettlebell Thruster',
+        'Kettlebell Full Swing',
+        'Kettlebell Swing',
+        'Kettlebell Deadlift',
+        'Kettlebell Alternating Single Arm Swing',
+        'Kettlebell Alternating High Row Catch',
+        'Kettlebell Goblet Squat',
+        'Kettlebell Front Rack Squat',
+        'Kettlebell Single Arm Squat Clean',
+        'Kettlebell Loot Carry RDL',
+        'Kettlebell Thruster'
       ],
       Lunge: [
-        'KB Reverse Lunge', 'KB Forward Lunge', 'KB Walking Lunge', 'KB Lateral Lunge',
-        'KB Rack Lunge', 'KB Overhead Lunge', 'KB Pass Through Lunge', 'KB Step-up',
-        'KB Deficit Lunge', 'KB Jump Lunge', 'KB Curtsy Lunge', 'KB Clock Lunge',
-        'KB Suitcase Lunge', 'KB Front Rack Step-up', 'KB Crossover Lunge', 'KB Box Jump',
-        'Double KB Lunge', 'KB Lunge to Press', 'KB Drop Lunge', 'KB Plyo Step-up'
+        'Kettlebell Alternating Forward Lunge',
+        'Kettlebell Alternating Reverse Lunge',
+        'Kettlebell Alternating Side Lunge',
+        'Kettlebell Goblet Reverse Lunge',
+        'Kettlebell Goblet Forward Lunge',
+        'Kettlebell Goblet Side Lunge',
+        'Kettlebell Front Rack Reverse Lunge',
+        'Kettlebell Front Rack Forward Lunge',
+        'Kettlebell Crusher Grip Reverse Lunge',
+        'Kettlebell Crusher Grip Forward Lunge',
+        'Kettlebell Crusher Grip Reverse Lunge w/ Knee'
       ],
-      Core: [
-        'KB Dead Bug', 'KB Russian Twist', 'KB Sit-up', 'KB Windmill',
-        'KB Turkish Get-up', 'KB Side Bend', 'KB Woodchop', 'KB Halo',
-        'KB Around the World', 'KB Figure 8', 'KB Plank Pull Through', 'KB Drag',
-        'KB Hot Potato', 'KB Single Arm Carry', 'KB Rack Walk', 'KB Overhead Carry',
-        'KB Suitcase Carry', 'KB Farmers Walk', 'KB Bottoms Up Carry', 'KB Waiter Walk'
-      ],
-      Cardio: [
-        'KB Swing', 'KB High Pull', 'KB Snatch', 'KB Clean and Press',
-        'KB Thruster', 'KB Long Cycle', 'KB Man Maker', 'KB Burpee',
-        'KB Jump Squat', 'KB Mountain Climber', 'KB Skater', 'KB Bear Crawl',
-        'KB Complex', 'KB EMOM Circuit', 'Double KB Complex', 'KB Flow',
-        'KB Sport Snatch', 'KB Jerk', 'KB Half Snatch', 'KB Biathlon'
-      ]
+      Core: SHARED_CORE_EXERCISES
     }
   },
   wheelchair: {
@@ -467,7 +491,7 @@ export const SUBCLASSES = {
         'Seated Dumbbell Lateral Raise',
         'Seated Dumbbell Skull Crusher',
         'Seated Dumbbell Wide Grip Shoulder Press',
-        'Seated Narrow Grip Shoulder Press',
+        'Seated Dumbbell Narrow Grip Shoulder Press',
         'Seated Dumbbell Arnold Press',
         'Seated Dumbbell Rotation Press',
         'Seated Banded Front Tricep Push Down',
@@ -558,7 +582,11 @@ export const SUBCLASSES = {
         'Staff Assisted March',
         'Staff Overhead March',
         'Staff Back Rack March',
-        'Staff Assisted March'
+        'Staff Readied March',
+        'Staff Shoudldered March',
+        'Staff Front Hold March',
+        'Staff Loot Carry March',
+        'Staff Chest Hold March'
       ]
     }
   }
