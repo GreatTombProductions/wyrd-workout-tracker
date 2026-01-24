@@ -1499,7 +1499,7 @@ export function renderVictoryScreen(container) {
       </div>
 
       <div class="screen-footer">
-        <button class="btn btn--secondary btn--full" id="download-summary">Download Summary</button>
+        <button class="btn btn--secondary btn--full" id="download-summary">View Summary Image</button>
         <button class="btn btn--full" id="new-workout">New Workout</button>
       </div>
     </div>
@@ -1530,43 +1530,19 @@ export function renderVictoryScreen(container) {
           useCORS: true
         });
 
-        const date = new Date().toISOString().split('T')[0];
-        const filename = `workout-summary-${date}.png`;
-
-        // Try Web Share API for mobile devices
-        let shared = false;
-        if (navigator.canShare && navigator.share) {
-          try {
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-            const file = new File([blob], filename, { type: 'image/png' });
-
-            if (navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                title: 'Worldtree Workout Summary'
-              });
-              shared = true;
-            }
-          } catch (shareErr) {
-            // User cancelled or share failed - fall through to download
-            if (shareErr.name === 'AbortError') {
-              shared = true; // User cancelled, don't download
-            }
-          }
-        }
-
-        // Fall back to download
-        if (!shared) {
-          const link = document.createElement('a');
-          link.download = filename;
-          link.href = canvas.toDataURL('image/png');
-          link.click();
+        // Open image in new tab
+        const dataUrl = canvas.toDataURL('image/png');
+        const newTab = window.open();
+        if (newTab) {
+          newTab.document.body.style.margin = '0';
+          newTab.document.body.style.background = '#2a2520';
+          newTab.document.body.innerHTML = `<img src="${dataUrl}" style="max-width:100%;display:block;margin:0 auto;">`;
         }
       } catch (err) {
         console.error('Failed to generate image:', err);
       } finally {
         downloadBtn.disabled = false;
-        downloadBtn.textContent = 'Download Summary';
+        downloadBtn.textContent = 'View Summary Image';
       }
     });
   }
