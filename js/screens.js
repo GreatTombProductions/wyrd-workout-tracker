@@ -1,6 +1,6 @@
 // Wyrd Workout - Screen Rendering
 
-import { DIE_SIZES, SUBCLASSES, CATEGORIES, getRecommendedHP, getAvailableCategories, getSubclassesForCategory } from './constants.js';
+import { DIE_SIZES, SUBCLASSES, CATEGORIES, getRecommendedHP, getRecommendedHPAdvanced, getAvailableCategories, getSubclassesForCategory } from './constants.js';
 
 // Helper to generate exercise options for a select dropdown
 function getExerciseOptions(subclass, category, exerciseDie) {
@@ -15,12 +15,109 @@ function getExerciseOptions(subclass, category, exerciseDie) {
   const maxOptions = Math.min(exerciseDie, exercises.length);
   for (let i = 1; i <= maxOptions; i++) {
     const exerciseName = exercises[i - 1] || `${category} ${i}`;
-    options.push({ value: i, label: `${i}. ${exerciseName}` });
+    // Last option gets "N+" to indicate higher rolls map here
+    const numLabel = (i === maxOptions && exerciseDie > exercises.length) ? `${i}+` : `${i}`;
+    options.push({ value: i, label: `${numLabel}. ${exerciseName}` });
   }
 
   return options;
 }
+
+// Helper to get all available categories for selected subclasses
+function getAvailableCategoriesForConfig(config) {
+  const allCategories = new Set();
+  config.subclasses.forEach(subclass => {
+    getAvailableCategories(subclass).forEach(cat => allCategories.add(cat));
+  });
+  return Array.from(allCategories);
+}
+
+// Helper to get all category+class combinations for advanced dice table
+function getAdvancedDiceRows(config) {
+  const rows = [];
+
+  if (config.multiclass && config.subclasses.length > 1) {
+    // Multiclass: show class+category combinations, grouped by category
+    const allCategories = getAvailableCategoriesForConfig(config);
+
+    for (const category of allCategories) {
+      // Find all classes that have this category
+      for (const subclassKey of config.subclasses) {
+        const subclass = SUBCLASSES[subclassKey];
+        if (!subclass) continue;
+
+        const subclassCategories = getAvailableCategories(subclassKey);
+        if (subclassCategories.includes(category)) {
+          rows.push({
+            key: `${subclassKey}:${category}`,
+            label: `${category} (${subclass.name})`,
+            category,
+            subclass: subclassKey
+          });
+        }
+      }
+    }
+  } else {
+    // Single class: just show categories
+    const categories = getAvailableCategoriesForConfig(config);
+    for (const category of categories) {
+      rows.push({
+        key: category,
+        label: category,
+        category,
+        subclass: null
+      });
+    }
+  }
+
+  return rows;
+}
+
+// Helper to render the advanced dice settings table
+function renderAdvancedDiceTable(config) {
+  const rows = getAdvancedDiceRows(config);
+
+  return `
+    <table class="advanced-dice-table">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Exercise Die</th>
+          <th>Rep Die</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(row => {
+          const catDice = config.categoryDice[row.key] || { exerciseDie: config.exerciseDie, repDie: config.repDie };
+          return `
+            <tr data-key="${row.key}">
+              <td class="category-cell" data-category="${row.category}">${row.label}</td>
+              <td>
+                <input type="number"
+                       class="advanced-die-input"
+                       data-key="${row.key}"
+                       data-type="exerciseDie"
+                       value="${catDice.exerciseDie}"
+                       min="1" max="100">
+              </td>
+              <td>
+                <input type="number"
+                       class="advanced-die-input"
+                       data-key="${row.key}"
+                       data-type="repDie"
+                       value="${catDice.repDie}"
+                       min="1" max="100">
+              </td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
 import * as State from './state.js';
+import { getExerciseDieForSlot, getRepDieForSlot } from './state.js';
 
 // Render the setup screen
 export function renderSetupScreen(container) {
@@ -37,12 +134,16 @@ export function renderSetupScreen(container) {
       <div class="screen-content">
         <div class="form-group">
           <div class="label-row">
-            <label>Choose Your Class</label>
+            <div class="label-with-help">
+              <label>Choose Your Class</label>
+              <button type="button" class="help-btn" data-help="class">?</button>
+            </div>
             <label class="multiclass-toggle">
               <input type="checkbox" id="multiclass-toggle" ${config.multiclass ? 'checked' : ''}>
               <span>Multiclass</span>
             </label>
           </div>
+          <div class="help-tooltip" data-tooltip="class">Your class determines what equipment you bring to the battlefield, and what exercises may be required of you.</div>
           <div class="subclass-grid">
             ${Object.entries(SUBCLASSES).map(([key, subclass]) => `
               <div class="subclass-option">
@@ -60,65 +161,93 @@ export function renderSetupScreen(container) {
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Exercise Die</label>
-          <div class="die-selector">
-            ${DIE_SIZES.map(size => `
-              <div class="die-option">
-                <input type="radio"
-                       id="exercise-die-${size}"
-                       name="exerciseDie"
-                       value="${size}"
-                       ${config.exerciseDie === size ? 'checked' : ''}>
-                <label for="exercise-die-${size}">D${size}</label>
+        <div class="strength-modifiers-container">
+          <div class="strength-modifiers-header">
+            <div class="label-with-help">
+              <label>Strength Modifiers</label>
+              <button type="button" class="help-btn" data-help="strength-modifiers">?</button>
+            </div>
+            <label class="advanced-toggle">
+              <input type="checkbox" id="advanced-dice-toggle" ${config.advancedDiceMode ? 'checked' : ''}>
+              <span>Advanced</span>
+            </label>
+          </div>
+          <div class="help-tooltip" data-tooltip="strength-modifiers">Configure your dice for exercises and reps. Advanced mode lets you set different dice per category.</div>
+
+          <div id="basic-dice-settings" class="${config.advancedDiceMode ? 'hidden' : ''}">
+            <div class="form-group">
+              <div class="label-with-help">
+                <label>Exercise Die</label>
+                <button type="button" class="help-btn" data-help="exercise-die">?</button>
               </div>
-            `).join('')}
-            <div class="die-option die-option--custom">
-              <input type="radio"
-                     id="exercise-die-custom"
-                     name="exerciseDie"
-                     value="custom"
-                     ${!DIE_SIZES.includes(config.exerciseDie) ? 'checked' : ''}>
-              <label for="exercise-die-custom" id="exercise-die-custom-label">D${!DIE_SIZES.includes(config.exerciseDie) ? config.exerciseDie : '?'}</label>
+              <div class="help-tooltip" data-tooltip="exercise-die">Exercises are ordered from easiest to hardest, so having more sides on your die means inviting greater potential challenge.</div>
+              <div class="die-selector">
+                ${DIE_SIZES.map(size => `
+                  <div class="die-option">
+                    <input type="radio"
+                           id="exercise-die-${size}"
+                           name="exerciseDie"
+                           value="${size}"
+                           ${config.exerciseDie === size ? 'checked' : ''}>
+                    <label for="exercise-die-${size}">D${size}</label>
+                  </div>
+                `).join('')}
+                <div class="die-option die-option--custom">
+                  <input type="radio"
+                         id="exercise-die-custom"
+                         name="exerciseDie"
+                         value="custom"
+                         ${!DIE_SIZES.includes(config.exerciseDie) ? 'checked' : ''}>
+                  <label for="exercise-die-custom" id="exercise-die-custom-label">D${!DIE_SIZES.includes(config.exerciseDie) ? config.exerciseDie : '?'}</label>
+                </div>
+              </div>
+              <div class="die-guide">Beginner: D4–D6 · Intermediate: D6–D20 · Advanced: D20</div>
+            </div>
+
+            <div class="die-link-row">
+              <button type="button" class="die-link-btn ${config.diceLocked ? 'die-link-btn--active' : ''}" id="dice-link-toggle">
+                ${config.diceLocked ? '&#x1F517;' : '&#x26D3;'}
+              </button>
+              <span class="die-link-label">${config.diceLocked ? 'Linked' : 'Unlinked'}</span>
+            </div>
+
+            <div class="form-group">
+              <label>Rep Die</label>
+              <div class="die-selector">
+                ${DIE_SIZES.map(size => `
+                  <div class="die-option">
+                    <input type="radio"
+                           id="rep-die-${size}"
+                           name="repDie"
+                           value="${size}"
+                           ${config.repDie === size ? 'checked' : ''}>
+                    <label for="rep-die-${size}">D${size}</label>
+                  </div>
+                `).join('')}
+                <div class="die-option die-option--custom">
+                  <input type="radio"
+                         id="rep-die-custom"
+                         name="repDie"
+                         value="custom"
+                         ${!DIE_SIZES.includes(config.repDie) ? 'checked' : ''}>
+                  <label for="rep-die-custom" id="rep-die-custom-label">D${!DIE_SIZES.includes(config.repDie) ? config.repDie : '?'}</label>
+                </div>
+              </div>
+              <div class="die-guide">Beginner: D4–D6 · Intermediate: D8–D12 · Advanced: D12–D20</div>
             </div>
           </div>
-          <div class="die-guide">Beginner: D4–D6 · Intermediate: D6–D20 · Advanced: D20</div>
-        </div>
 
-        <div class="die-link-row">
-          <button type="button" class="die-link-btn ${config.diceLocked ? 'die-link-btn--active' : ''}" id="dice-link-toggle">
-            ${config.diceLocked ? '&#x1F517;' : '&#x26D3;'}
-          </button>
-          <span class="die-link-label">${config.diceLocked ? 'Linked' : 'Unlinked'}</span>
-        </div>
-
-        <div class="form-group">
-          <label>Rep Die</label>
-          <div class="die-selector">
-            ${DIE_SIZES.map(size => `
-              <div class="die-option">
-                <input type="radio"
-                       id="rep-die-${size}"
-                       name="repDie"
-                       value="${size}"
-                       ${config.repDie === size ? 'checked' : ''}>
-                <label for="rep-die-${size}">D${size}</label>
-              </div>
-            `).join('')}
-            <div class="die-option die-option--custom">
-              <input type="radio"
-                     id="rep-die-custom"
-                     name="repDie"
-                     value="custom"
-                     ${!DIE_SIZES.includes(config.repDie) ? 'checked' : ''}>
-              <label for="rep-die-custom" id="rep-die-custom-label">D${!DIE_SIZES.includes(config.repDie) ? config.repDie : '?'}</label>
-            </div>
+          <div id="advanced-dice-settings" class="${config.advancedDiceMode ? '' : 'hidden'}">
+            ${renderAdvancedDiceTable(config)}
           </div>
-          <div class="die-guide">Beginner: D4–D6 · Intermediate: D8–D12 · Advanced: D12–D20</div>
         </div>
 
         <div class="form-group">
-          <label>Encounter HP</label>
+          <div class="label-with-help">
+            <label>Encounter HP</label>
+            <button type="button" class="help-btn" data-help="hp">?</button>
+          </div>
+          <div class="help-tooltip" data-tooltip="hp">Each rep will deal 1 damage to the encounter. The recommended encounter HP is determined by your selected Rep Die.</div>
           <div class="hp-input-group">
             <input type="number"
                    id="hp-threshold"
@@ -126,7 +255,7 @@ export function renderSetupScreen(container) {
                    min="50"
                    max="1000"
                    step="10">
-            <span class="hp-recommendation">Recommended: ${getRecommendedHP(config.repDie)}</span>
+            <span class="hp-recommendation">Recommended: ${config.advancedDiceMode ? getRecommendedHPAdvanced(config.categoryDice) : getRecommendedHP(config.repDie)}</span>
           </div>
         </div>
 
@@ -197,12 +326,48 @@ function attachSetupListeners(container) {
           .map(el => el.value);
         if (checked.length > 0) {
           State.updateConfig({ subclasses: checked });
+          // Update advanced dice table if in advanced mode
+          updateAdvancedDiceTable();
         } else {
           // Prevent deselecting all - recheck this one
           input.checked = true;
         }
       });
     });
+  }
+
+  // Helper to update the advanced dice table when subclasses change
+  function updateAdvancedDiceTable() {
+    const state = State.getState();
+    if (!state.sessionConfig.advancedDiceMode) return;
+
+    const advancedSettings = container.querySelector('#advanced-dice-settings');
+    if (!advancedSettings) return;
+
+    // Get new rows and preserve existing dice values
+    const rows = getAdvancedDiceRows(state.sessionConfig);
+    const oldCategoryDice = state.sessionConfig.categoryDice || {};
+    const newCategoryDice = {};
+
+    rows.forEach(row => {
+      if (oldCategoryDice[row.key]) {
+        newCategoryDice[row.key] = oldCategoryDice[row.key];
+      } else {
+        newCategoryDice[row.key] = {
+          exerciseDie: state.sessionConfig.exerciseDie,
+          repDie: state.sessionConfig.repDie
+        };
+      }
+    });
+
+    State.updateConfig({ categoryDice: newCategoryDice });
+
+    // Re-render the table
+    advancedSettings.innerHTML = renderAdvancedDiceTable(State.getState().sessionConfig);
+    attachAdvancedDiceListeners(container);
+
+    // Update HP recommendation
+    updateHPRecommendation();
   }
 
   // Multiclass toggle
@@ -219,6 +384,8 @@ function attachSetupListeners(container) {
       }
       // Update just the subclass grid
       updateSubclassGrid();
+      // Update advanced dice table if in advanced mode
+      updateAdvancedDiceTable();
     });
   }
 
@@ -275,6 +442,46 @@ function attachSetupListeners(container) {
     const hpRec = container.querySelector('.hp-recommendation');
     if (hpInput) hpInput.value = recommended;
     if (hpRec) hpRec.textContent = `Recommended: ${recommended}`;
+  }
+
+  // Helper to update HP recommendation based on current mode
+  function updateHPRecommendation() {
+    const state = State.getState();
+    const config = state.sessionConfig;
+    let recommended;
+    if (config.advancedDiceMode) {
+      recommended = getRecommendedHPAdvanced(config.categoryDice);
+    } else {
+      recommended = getRecommendedHP(config.repDie);
+    }
+    State.updateConfig({ hpThreshold: recommended });
+    updateHPUI(recommended);
+  }
+
+  // Attach listeners to advanced dice inputs
+  function attachAdvancedDiceListeners(container) {
+    container.querySelectorAll('.advanced-die-input').forEach(input => {
+      input.addEventListener('change', () => {
+        const key = input.dataset.key;
+        const type = input.dataset.type;
+        const value = parseInt(input.value) || 6;
+
+        const state = State.getState();
+        const categoryDice = { ...state.sessionConfig.categoryDice };
+
+        if (!categoryDice[key]) {
+          categoryDice[key] = { exerciseDie: 6, repDie: 6 };
+        }
+        categoryDice[key][type] = value;
+
+        State.updateConfig({ categoryDice });
+
+        // Update HP recommendation if rep die changed
+        if (type === 'repDie') {
+          updateHPRecommendation();
+        }
+      });
+    });
   }
 
   // Helper to apply die value with linked sync
@@ -388,6 +595,62 @@ function attachSetupListeners(container) {
     });
   });
 
+  // Advanced dice mode toggle
+  const advancedToggle = container.querySelector('#advanced-dice-toggle');
+  if (advancedToggle) {
+    advancedToggle.addEventListener('change', () => {
+      const isAdvanced = advancedToggle.checked;
+      const basicSettings = container.querySelector('#basic-dice-settings');
+      const advancedSettings = container.querySelector('#advanced-dice-settings');
+
+      // If switching to advanced mode, initialize categoryDice from current values
+      if (isAdvanced) {
+        const state = State.getState();
+        const rows = getAdvancedDiceRows(state.sessionConfig);
+        const categoryDice = {};
+        rows.forEach(row => {
+          categoryDice[row.key] = {
+            exerciseDie: state.sessionConfig.exerciseDie,
+            repDie: state.sessionConfig.repDie
+          };
+        });
+        State.updateConfig({ advancedDiceMode: true, categoryDice });
+
+        // Update the table
+        advancedSettings.innerHTML = renderAdvancedDiceTable(State.getState().sessionConfig);
+        attachAdvancedDiceListeners(container);
+      } else {
+        State.updateConfig({ advancedDiceMode: false });
+      }
+
+      // Toggle visibility
+      if (basicSettings) basicSettings.classList.toggle('hidden', isAdvanced);
+      if (advancedSettings) advancedSettings.classList.toggle('hidden', !isAdvanced);
+
+      // Update HP recommendation
+      updateHPRecommendation();
+    });
+  }
+
+  // Advanced dice input listeners
+  attachAdvancedDiceListeners(container);
+
+  // Help tooltips
+  container.querySelectorAll('.help-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const helpKey = btn.dataset.help;
+      const tooltip = container.querySelector(`.help-tooltip[data-tooltip="${helpKey}"]`);
+      if (tooltip) {
+        // Close any other open tooltips
+        container.querySelectorAll('.help-tooltip.active').forEach(t => {
+          if (t !== tooltip) t.classList.remove('active');
+        });
+        tooltip.classList.toggle('active');
+      }
+    });
+  });
+
   // Begin workout button
   const beginBtn = container.querySelector('#begin-workout');
   if (beginBtn) {
@@ -413,7 +676,7 @@ export function renderRollScreen(container) {
   container.innerHTML = `
     <div class="screen">
       <h1>${isNewRound ? `Round ${session.currentRound}` : 'Roll Your Fate'}</h1>
-      ${!isNewRound ? '<p class="roll-subheader">Use inputs for physical dice (reps will be roll + die sides)</p>' : ''}
+      ${!isNewRound ? '<p class="roll-subheader">Brought your own dice? Input your rolls on the left!</p>' : ''}
 
       <div class="screen-content">
         ${renderAllAtOnceMode(session, isNewRound)}
@@ -449,7 +712,7 @@ function renderSingleSlot(session, slot, index, isNewRound) {
   const validSubclassesForCategory = getSubclassesForCategory(session.config.subclasses, slot.category);
   const canRerollExercise = !isNewRound && hasExercise;
   const canRerollClass = !isNewRound && isMulticlass && hasSubclass && !hasExercise && validSubclassesForCategory.length > 1;
-  const canRerollReps = !isNewRound && hasReps;
+  const canRerollReps = hasReps; // Allow reroll during per-round rolling too
   const canDelete = canEdit && session.slots.length > 1;
   const isFirst = index === 0;
   const isLast = index === session.slots.length - 1;
@@ -493,22 +756,31 @@ function renderSingleSlot(session, slot, index, isNewRound) {
                 `).join('')}
               </select>
               <button class="btn btn--small" data-roll-subclass="${index}">Roll<br>Class</button>
+              <span class="die-indicator">D${validSubclasses.length}</span>
             `;
             })() : ''}
-            ${!isNewRound && hasSubclass && !hasExercise ? `
+            ${!isNewRound && hasSubclass && !hasExercise ? (() => {
+              const exerciseDie = getExerciseDieForSlot(session.config, slot.category, slot.subclass);
+              return `
               <select class="roll-select" data-slot="${index}" data-type="exercise">
                 <option value="">Select...</option>
-                ${getExerciseOptions(slot.subclass, slot.category, session.config.exerciseDie).map(opt => `
+                ${getExerciseOptions(slot.subclass, slot.category, exerciseDie).map(opt => `
                   <option value="${opt.value}">${opt.label}</option>
                 `).join('')}
               </select>
               <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
-            ` : ''}
-            ${hasExercise && !hasReps ? `
+              <span class="die-indicator">D${exerciseDie}</span>
+            `;
+            })() : ''}
+            ${hasExercise && !hasReps ? (() => {
+              const repDie = getRepDieForSlot(session.config, slot.category, slot.subclass);
+              return `
               <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
-                     min="1" max="${session.config.repDie}">
+                     min="1" max="${repDie}">
               <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
-            ` : ''}
+              <span class="die-indicator">D${repDie}</span>
+            `;
+            })() : ''}
           </div>
         ` : ''}
         ${hasExercise && hasReps ? `
@@ -544,7 +816,12 @@ function renderAllAtOnceMode(session, isNewRound) {
     `;
   }
 
-  return slotsHtml;
+  // Per-round rolling - show Roll All button but not Add Exercise
+  return slotsHtml + `
+    <div class="slot-actions-container">
+      <button class="btn btn--small" id="roll-all-btn">Roll All</button>
+    </div>
+  `;
 }
 
 // Refresh all slot indices after structural changes (move/delete/duplicate/add)
@@ -663,19 +940,25 @@ function renderRevealMode(session) {
               <span class="roll-slot-subclass text-muted">${subclassName}</span>
             `}
           </div>
-          ${hasControls ? `
+          ${hasControls ? (() => {
+            const exerciseDie = getExerciseDieForSlot(session.config, slot.category, slot.subclass);
+            const repDie = getRepDieForSlot(session.config, slot.category, slot.subclass);
+            return `
             <div class="roll-controls">
               ${!hasExercise ? `
                 <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
-                       min="1" max="${session.config.exerciseDie}">
+                       min="1" max="${exerciseDie}">
                 <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
+                <span class="die-indicator">D${exerciseDie}</span>
               ` : !hasReps ? `
                 <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
-                       min="1" max="${session.config.repDie}">
+                       min="1" max="${repDie}">
                 <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll</button>
+                <span class="die-indicator">D${repDie}</span>
               ` : ''}
             </div>
-          ` : ''}
+          `;
+          })() : ''}
           ${hasExercise && hasReps ? `
             <div class="roll-slot-reps">
               <strong>${slot.actualReps} reps</strong>
@@ -711,7 +994,7 @@ function updateRollSlot(container, session, index, isNewRound) {
   const validSubclassesForCategory = getSubclassesForCategory(session.config.subclasses, slot.category);
   const canRerollExercise = !isNewRound && hasExercise;
   const canRerollClass = !isNewRound && isMulticlass && hasSubclass && !hasExercise && validSubclassesForCategory.length > 1;
-  const canRerollReps = !isNewRound && hasReps;
+  const canRerollReps = hasReps; // Allow reroll during per-round rolling too
 
   // Determine if we need controls
   const hasControls = (!isNewRound && isMulticlass && !hasSubclass) ||
@@ -797,22 +1080,27 @@ function updateRollSlot(container, session, index, isNewRound) {
           `).join('')}
         </select>
         <button class="btn btn--small" data-roll-subclass="${index}">Roll<br>Class</button>
+        <span class="die-indicator">D${validSubclasses.length}</span>
       `;
     } else if (!isNewRound && hasSubclass && !hasExercise) {
+      const exerciseDie = getExerciseDieForSlot(session.config, slot.category, slot.subclass);
       newControls = `
         <select class="roll-select" data-slot="${index}" data-type="exercise">
           <option value="">Select...</option>
-          ${getExerciseOptions(slot.subclass, slot.category, session.config.exerciseDie).map(opt => `
+          ${getExerciseOptions(slot.subclass, slot.category, exerciseDie).map(opt => `
             <option value="${opt.value}">${opt.label}</option>
           `).join('')}
         </select>
         <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
+        <span class="die-indicator">D${exerciseDie}</span>
       `;
     } else if (hasExercise && !hasReps) {
+      const repDie = getRepDieForSlot(session.config, slot.category, slot.subclass);
       newControls = `
         <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
-               min="1" max="${session.config.repDie}">
+               min="1" max="${repDie}">
         <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
+        <span class="die-indicator">D${repDie}</span>
       `;
     }
 
@@ -965,8 +1253,11 @@ function attachSlotListeners(container, controlsEl, session, isNewRound) {
   if (repsInput && repsBtn) {
     repsInput.addEventListener('input', () => {
       if (repsInput.value) {
+        const slotIndex = parseInt(repsInput.dataset.slot);
+        const slot = State.getState().session.slots[slotIndex];
+        const repDie = getRepDieForSlot(State.getState().session.config, slot.category, slot.subclass);
         repsBtn.classList.add('btn--has-input');
-        repsBtn.innerHTML = 'Confirm<br>Input';
+        repsBtn.innerHTML = `Confirm Roll<br><span class="btn-formula">Reps = ${repDie} + ${repsInput.value}</span>`;
       } else {
         repsBtn.classList.remove('btn--has-input');
         repsBtn.innerHTML = 'Roll<br>Reps';
@@ -999,6 +1290,16 @@ function attachRollListeners(container, session, isNewRound) {
   // Slot manipulation listeners (only on initial roll)
   if (!isNewRound) {
     attachSlotManipulationListeners(container, session, isNewRound);
+  }
+
+  // Roll All button (available in both initial and per-round rolling)
+  const rollAllBtn = container.querySelector('#roll-all-btn');
+  if (rollAllBtn) {
+    const newRollAllBtn = rollAllBtn.cloneNode(true);
+    rollAllBtn.parentNode.replaceChild(newRollAllBtn, rollAllBtn);
+    newRollAllBtn.addEventListener('click', () => {
+      rollAllPending(container, isNewRound);
+    });
   }
 
   // Enter workout button
@@ -1078,16 +1379,6 @@ function attachSlotManipulationListeners(container, session, isNewRound) {
     addBtn.parentNode.replaceChild(newAddBtn, addBtn);
     newAddBtn.addEventListener('click', () => {
       showAddExerciseModal(container, State.getState().session, isNewRound);
-    });
-  }
-
-  // Roll All button
-  const rollAllBtn = container.querySelector('#roll-all-btn');
-  if (rollAllBtn) {
-    const newRollAllBtn = rollAllBtn.cloneNode(true);
-    rollAllBtn.parentNode.replaceChild(newRollAllBtn, rollAllBtn);
-    newRollAllBtn.addEventListener('click', () => {
-      rollAllPending(container, isNewRound);
     });
   }
 }
@@ -1440,6 +1731,19 @@ function attachWorkoutListeners(container, isFinal) {
 }
 
 // Render the victory screen
+// Helper to get weight display for an exercise
+function getWeightDisplay(exerciseName, round, weights) {
+  if (!weights || !weights[exerciseName]) return '';
+
+  const weight = weights[exerciseName];
+  // If weight is an object with per-round values
+  if (typeof weight === 'object') {
+    return weight[round] || '';
+  }
+  // If weight is a string (all rounds same)
+  return weight;
+}
+
 export function renderVictoryScreen(container) {
   const stats = State.getSessionStats();
 
@@ -1456,6 +1760,10 @@ export function renderVictoryScreen(container) {
     }
     exercisesByRound[ex.round].push(ex);
   });
+
+  // Get unique exercises for weight editing
+  const uniqueExercises = [...new Set(stats.exerciseHistory.map(ex => ex.exerciseName))];
+  const totalRounds = stats.totalRounds;
 
   container.innerHTML = `
     <div class="screen">
@@ -1478,17 +1786,21 @@ export function renderVictoryScreen(container) {
             </div>
           </div>
 
-          <div class="victory-history">
+          <div class="victory-history" id="victory-history">
             ${Object.entries(exercisesByRound).map(([round, exercises]) => `
               <div class="victory-round">
                 <div class="victory-round-header">Round ${round}</div>
                 <div class="victory-exercises">
-                  ${exercises.map(ex => `
-                    <div class="victory-exercise">
-                      <span class="victory-exercise-name">${ex.exerciseName}</span>
-                      <span class="victory-exercise-reps">× ${ex.reps}</span>
-                    </div>
-                  `).join('')}
+                  ${exercises.map(ex => {
+                    const weight = getWeightDisplay(ex.exerciseName, parseInt(round), stats.exerciseWeights);
+                    const weightDisplay = weight ? `<span class="victory-exercise-weight">${weight}</span> ` : '';
+                    return `
+                      <div class="victory-exercise">
+                        <span class="victory-exercise-name">${ex.exerciseName}</span>
+                        <span class="victory-exercise-reps">${weightDisplay}× ${ex.reps}</span>
+                      </div>
+                    `;
+                  }).join('')}
                 </div>
               </div>
             `).join('')}
@@ -1500,6 +1812,7 @@ export function renderVictoryScreen(container) {
 
       <div class="screen-footer">
         <button class="btn btn--secondary btn--full" id="download-summary">View Summary Image</button>
+        <button class="btn btn--secondary btn--full" id="add-weights">Add Weights</button>
         <button class="btn btn--full" id="new-workout">New Workout</button>
       </div>
     </div>
@@ -1510,6 +1823,13 @@ export function renderVictoryScreen(container) {
     newBtn.addEventListener('click', () => {
       State.clearSession();
       State.setScreen('setup');
+    });
+  }
+
+  const addWeightsBtn = container.querySelector('#add-weights');
+  if (addWeightsBtn) {
+    addWeightsBtn.addEventListener('click', () => {
+      renderWeightEditScreen(container, stats, uniqueExercises, totalRounds);
     });
   }
 
@@ -1546,6 +1866,194 @@ export function renderVictoryScreen(container) {
       }
     });
   }
+}
+
+// Render the weight editing screen
+function renderWeightEditScreen(container, stats, uniqueExercises, totalRounds) {
+  // Store current weights as backup for cancel
+  const originalWeights = JSON.parse(JSON.stringify(stats.exerciseWeights || {}));
+
+  // Working copy of weights
+  let workingWeights = JSON.parse(JSON.stringify(stats.exerciseWeights || {}));
+  let linkedMode = true; // Start in linked mode (editing all rounds)
+
+  function renderScreen() {
+    container.innerHTML = `
+      <div class="screen">
+        <h1 class="victory-title">Add Weights</h1>
+
+        <div class="weight-link-toggle">
+          <button class="btn btn--small weight-link-btn ${linkedMode ? 'btn--has-input' : ''}" id="toggle-link">
+            ${linkedMode ? '🔗' : '⛓️‍💥'}
+          </button>
+          <span class="weight-link-status">
+            ${linkedMode ? 'Editing all rounds' : 'Editing individual rounds'}
+          </span>
+        </div>
+
+        <div class="weight-table-wrapper">
+            <table class="weight-table">
+              <thead>
+                <tr>
+                  <th class="weight-table-exercise">Exercise</th>
+                  ${linkedMode
+                    ? '<th class="weight-table-weight">Weight</th>'
+                    : Array.from({ length: totalRounds }, (_, i) => `<th class="weight-table-round">R${i + 1}</th>`).join('')
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                ${uniqueExercises.map(exercise => `
+                  <tr>
+                    <td class="weight-table-exercise-name">${exercise}</td>
+                    ${linkedMode
+                      ? `<td>
+                          <input type="text"
+                            class="weight-input"
+                            data-exercise="${exercise}"
+                            value="${typeof workingWeights[exercise] === 'string' ? workingWeights[exercise] : (workingWeights[exercise]?.[1] || '')}"
+                            placeholder="e.g. 50kg"
+                          />
+                        </td>`
+                      : Array.from({ length: totalRounds }, (_, i) => {
+                          const round = i + 1;
+                          const value = typeof workingWeights[exercise] === 'object'
+                            ? (workingWeights[exercise][round] || '')
+                            : (typeof workingWeights[exercise] === 'string' ? workingWeights[exercise] : '');
+                          return `
+                            <td>
+                              <input type="text"
+                                class="weight-input weight-input--small"
+                                data-exercise="${exercise}"
+                                data-round="${round}"
+                                value="${value}"
+                                placeholder=""
+                              />
+                            </td>
+                          `;
+                        }).join('')
+                    }
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+        </div>
+
+        <div class="screen-footer">
+          <button class="btn btn--full" id="confirm-weights">Confirm</button>
+          <button class="btn btn--secondary btn--full" id="cancel-weights">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    // Toggle link mode
+    const toggleBtn = container.querySelector('#toggle-link');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        // Save current inputs before toggling
+        saveCurrentInputs();
+        linkedMode = !linkedMode;
+
+        // When switching to linked mode, consolidate weights
+        if (linkedMode) {
+          Object.keys(workingWeights).forEach(exercise => {
+            if (typeof workingWeights[exercise] === 'object') {
+              // Take the first non-empty value
+              const firstValue = Object.values(workingWeights[exercise]).find(v => v) || '';
+              workingWeights[exercise] = firstValue;
+            }
+          });
+        } else {
+          // When switching to unlinked, expand string values to per-round
+          Object.keys(workingWeights).forEach(exercise => {
+            if (typeof workingWeights[exercise] === 'string') {
+              const value = workingWeights[exercise];
+              workingWeights[exercise] = {};
+              for (let r = 1; r <= totalRounds; r++) {
+                workingWeights[exercise][r] = value;
+              }
+            }
+          });
+        }
+
+        renderScreen();
+      });
+    }
+
+    // Input change handlers
+    container.querySelectorAll('.weight-input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const exercise = e.target.dataset.exercise;
+        const round = e.target.dataset.round ? parseInt(e.target.dataset.round) : null;
+        const value = e.target.value;
+
+        if (linkedMode) {
+          workingWeights[exercise] = value;
+        } else {
+          if (typeof workingWeights[exercise] !== 'object') {
+            workingWeights[exercise] = {};
+          }
+          workingWeights[exercise][round] = value;
+        }
+      });
+    });
+
+    // Confirm button
+    const confirmBtn = container.querySelector('#confirm-weights');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', () => {
+        saveCurrentInputs();
+        // Clean up empty weights
+        const cleanedWeights = {};
+        Object.keys(workingWeights).forEach(exercise => {
+          const weight = workingWeights[exercise];
+          if (typeof weight === 'string' && weight.trim()) {
+            cleanedWeights[exercise] = weight.trim();
+          } else if (typeof weight === 'object') {
+            const hasValues = Object.values(weight).some(v => v && v.trim());
+            if (hasValues) {
+              cleanedWeights[exercise] = {};
+              Object.keys(weight).forEach(r => {
+                if (weight[r] && weight[r].trim()) {
+                  cleanedWeights[exercise][r] = weight[r].trim();
+                }
+              });
+            }
+          }
+        });
+        State.setAllExerciseWeights(cleanedWeights);
+        renderVictoryScreen(container);
+      });
+    }
+
+    // Cancel button
+    const cancelBtn = container.querySelector('#cancel-weights');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        State.setAllExerciseWeights(originalWeights);
+        renderVictoryScreen(container);
+      });
+    }
+  }
+
+  function saveCurrentInputs() {
+    container.querySelectorAll('.weight-input').forEach(input => {
+      const exercise = input.dataset.exercise;
+      const round = input.dataset.round ? parseInt(input.dataset.round) : null;
+      const value = input.value;
+
+      if (linkedMode) {
+        workingWeights[exercise] = value;
+      } else {
+        if (typeof workingWeights[exercise] !== 'object') {
+          workingWeights[exercise] = {};
+        }
+        workingWeights[exercise][round] = value;
+      }
+    });
+  }
+
+  renderScreen();
 }
 
 // Render the resume modal

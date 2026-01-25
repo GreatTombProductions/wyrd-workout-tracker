@@ -626,8 +626,33 @@ export const DEFAULT_SESSION_CONFIG = {
   hpThreshold: 150,
   roundTemplate: DEFAULT_ROUND_TEMPLATE,
   rollMode: 'all-at-once',
-  repMode: 'fixed'
+  repMode: 'fixed',
+  advancedDiceMode: false,
+  categoryDice: {} // { categoryName: { exerciseDie: number, repDie: number } }
 };
+
+// Get recommended HP for advanced dice mode (average of all rep dice, rounded)
+export function getRecommendedHPAdvanced(categoryDice) {
+  if (!categoryDice || Object.keys(categoryDice).length === 0) {
+    return HP_RECOMMENDATIONS[6]; // Default fallback
+  }
+
+  let totalRepDice = 0;
+  let count = 0;
+
+  for (const key of Object.keys(categoryDice)) {
+    const dice = categoryDice[key];
+    if (dice && dice.repDie) {
+      totalRepDice += dice.repDie;
+      count++;
+    }
+  }
+
+  if (count === 0) return HP_RECOMMENDATIONS[6];
+
+  const averageRepDie = Math.round(totalRepDice / count);
+  return getRecommendedHP(averageRepDie);
+}
 
 // Storage key for user preferences (persisted across sessions)
 export const PREFS_STORAGE_KEY = 'wyrd-workout-prefs';

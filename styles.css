@@ -214,6 +214,14 @@ h3 {
   box-shadow: 0 0 8px var(--cat-core);
 }
 
+.btn-formula {
+  font-size: 0.5rem;
+  opacity: 0.85;
+  font-family: var(--font-body);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .btn--full {
   width: 100%;
 }
@@ -1342,4 +1350,307 @@ input[type="text"]:focus {
 .category-btn {
   flex: 1 1 auto;
   min-width: 100px;
+}
+
+/* Help tooltips */
+.label-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.label-with-help > label {
+  display: inline;
+  margin-bottom: 0;
+}
+
+.label-row .label-with-help {
+  margin-bottom: 0;
+}
+
+.help-btn {
+  background: transparent;
+  border: 1.5px solid var(--text-muted);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 0.7rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  position: relative;
+  top: -1px;
+}
+
+.help-btn:hover,
+.help-btn:focus {
+  border-color: var(--accent-burgundy-light);
+  color: var(--text-primary);
+}
+
+.help-tooltip {
+  display: none;
+  background: var(--bg-parchment);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  animation: fadeIn 0.2s ease;
+}
+
+.help-tooltip.active {
+  display: block;
+}
+
+/* Strength Modifiers Container */
+.strength-modifiers-container {
+  background: var(--bg-card);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.strength-modifiers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.strength-modifiers-header .label-with-help {
+  margin-bottom: 0;
+}
+
+.strength-modifiers-header .label-with-help > label {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+/* Advanced toggle */
+.advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-bottom: 0;
+}
+
+.advanced-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-burgundy);
+}
+
+/* Advanced dice table */
+.advanced-dice-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--spacing-sm);
+}
+
+.advanced-dice-table th,
+.advanced-dice-table td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.advanced-dice-table th {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.advanced-dice-table .category-cell {
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Category colors in advanced table */
+.advanced-dice-table .category-cell[data-category="Push"] { color: var(--cat-push); }
+.advanced-dice-table .category-cell[data-category="Pull"] { color: var(--cat-pull); }
+.advanced-dice-table .category-cell[data-category="Squat/Hinge"] { color: var(--cat-squat); }
+.advanced-dice-table .category-cell[data-category="Lunge"] { color: var(--cat-lunge); }
+.advanced-dice-table .category-cell[data-category="Core"] { color: var(--cat-core); }
+.advanced-dice-table .category-cell[data-category="Cardio"] { color: var(--cat-cardio); }
+.advanced-dice-table .category-cell[data-category="Upper Body"] { color: var(--cat-upper); }
+.advanced-dice-table .category-cell[data-category="Lower Body"] { color: var(--cat-lower); }
+
+.advanced-die-input {
+  width: 60px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: var(--spacing-xs);
+  border: 2px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+}
+
+.advanced-die-input:focus {
+  outline: none;
+  border-color: var(--accent-burgundy);
+}
+
+/* Die indicator */
+.die-indicator {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-left: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+/* Hidden utility class */
+.hidden {
+  display: none !important;
+}
+
+/* Weight editing screen */
+.weight-link-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-card);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.weight-link-btn {
+  font-size: 1rem !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+}
+
+.weight-link-status {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.weight-table-wrapper {
+  flex: 1;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 calc(var(--spacing-md) * -1);
+  padding: 0 var(--spacing-md);
+}
+
+.weight-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 300px;
+}
+
+.weight-table th,
+.weight-table td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  text-align: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.weight-table th {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.weight-table-exercise {
+  text-align: left !important;
+}
+
+.weight-table-exercise-name {
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  max-width: 120px;
+  min-width: 80px;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.weight-table-weight {
+  min-width: 100px;
+}
+
+.weight-table-round {
+  min-width: 70px;
+}
+
+.weight-input {
+  width: 100%;
+  max-width: 120px;
+  height: 32px;
+  padding: 0 4px;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  line-height: 32px;
+  text-align: center;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  min-height: unset;
+}
+
+.weight-input:focus {
+  outline: none;
+  border-color: var(--accent-burgundy);
+}
+
+.weight-input--small {
+  max-width: 60px;
+  height: 28px;
+  line-height: 28px;
+  padding: 0 2px;
+  font-size: 0.7rem;
+}
+
+.weight-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* Weight display in victory summary */
+.victory-exercise-weight {
+  color: var(--cat-core);
+  font-weight: 600;
+  margin-right: 2px;
 }

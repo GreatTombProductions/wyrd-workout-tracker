@@ -38,7 +38,9 @@ function savePreferences() {
     repDie: sessionConfig.repDie,
     diceLocked: sessionConfig.diceLocked,
     hpThreshold: sessionConfig.hpThreshold,
-    repMode: sessionConfig.repMode
+    repMode: sessionConfig.repMode,
+    advancedDiceMode: sessionConfig.advancedDiceMode,
+    categoryDice: sessionConfig.categoryDice
   };
   localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
 }
@@ -241,12 +243,50 @@ export function initSession() {
   notify();
 }
 
+// Get the categoryDice key for a slot (handles multiclass format)
+function getCategoryDiceKey(config, category, subclass) {
+  if (config.multiclass && config.subclasses.length > 1 && subclass) {
+    return `${subclass}:${category}`;
+  }
+  return category;
+}
+
+// Get exercise die for a slot (respects advanced mode)
+export function getExerciseDieForSlot(config, category, subclass = null) {
+  if (!config.advancedDiceMode) return config.exerciseDie;
+
+  const key = getCategoryDiceKey(config, category, subclass);
+  if (config.categoryDice[key]) {
+    return config.categoryDice[key].exerciseDie || config.exerciseDie;
+  }
+  // Fallback to category-only key for backwards compatibility
+  if (config.categoryDice[category]) {
+    return config.categoryDice[category].exerciseDie || config.exerciseDie;
+  }
+  return config.exerciseDie;
+}
+
+// Get rep die for a slot (respects advanced mode)
+export function getRepDieForSlot(config, category, subclass = null) {
+  if (!config.advancedDiceMode) return config.repDie;
+
+  const key = getCategoryDiceKey(config, category, subclass);
+  if (config.categoryDice[key]) {
+    return config.categoryDice[key].repDie || config.repDie;
+  }
+  // Fallback to category-only key for backwards compatibility
+  if (config.categoryDice[category]) {
+    return config.categoryDice[category].repDie || config.repDie;
+  }
+  return config.repDie;
+}
+
 // Roll exercise for a slot (no notify - caller handles re-render)
 export function rollExerciseForSlot(slotIndex, manualValue = null) {
   if (!session || !session.slots[slotIndex]) return;
 
   const slot = session.slots[slotIndex];
-  const maxExercise = session.config.exerciseDie;
+  const maxExercise = getExerciseDieForSlot(session.config, slot.category, slot.subclass);
 
   // Use manual value or roll
   const roll = manualValue !== null
@@ -264,7 +304,7 @@ export function rollRepsForSlot(slotIndex, manualValue = null) {
   if (!session || !session.slots[slotIndex]) return;
 
   const slot = session.slots[slotIndex];
-  const repDie = session.config.repDie;
+  const repDie = getRepDieForSlot(session.config, slot.category, slot.subclass);
 
   // Use manual value or roll
   const roll = manualValue !== null
@@ -468,8 +508,9 @@ function startNewRound() {
       // Use base rep rolls
       const baseRoll = session.baseRepRolls[i];
       if (baseRoll !== undefined) {
+        const repDie = getRepDieForSlot(session.config, newSlots[i].category, newSlots[i].subclass);
         newSlots[i].repRoll = baseRoll;
-        newSlots[i].actualReps = baseRoll + session.config.repDie;
+        newSlots[i].actualReps = baseRoll + repDie;
       }
     }
     // For per-round mode, reps stay null and will be rolled
@@ -554,8 +595,72 @@ export function getSessionStats() {
     totalTime: getFormattedTime(),
     totalRounds: session.currentRound,
     totalReps: session.totalRepsCompleted,
-    exerciseHistory: session.exerciseHistory || []
+    exerciseHistory: session.exerciseHistory || [],
+    exerciseWeights: session.exerciseWeights || {}
   };
+}
+
+// Get weight for an exercise (optionally for a specific round)
+export function getExerciseWeight(exerciseName, round = null) {
+  if (!session || !session.exerciseWeights) return '';
+
+  const weight = session.exerciseWeights[exerciseName];
+  if (!weight) return '';
+
+  // If weight is an object with per-round values
+  if (typeof weight === 'object' && round !== null) {
+    return weight[round] || '';
+  }
+
+  // If weight is a string (all rounds same)
+  if (typeof weight === 'string') {
+    return weight;
+  }
+
+  return '';
+}
+
+// Set weight for an exercise
+// If round is null, sets for all rounds (linked mode)
+// If round is provided, sets for that specific round (unlinked mode)
+export function setExerciseWeight(exerciseName, weight, round = null) {
+  if (!session) return;
+
+  if (!session.exerciseWeights) {
+    session.exerciseWeights = {};
+  }
+
+  if (round === null) {
+    // Linked mode - same weight for all rounds
+    session.exerciseWeights[exerciseName] = weight;
+  } else {
+    // Unlinked mode - per-round weights
+    const existing = session.exerciseWeights[exerciseName];
+    if (typeof existing === 'string') {
+      // Convert from linked to unlinked
+      session.exerciseWeights[exerciseName] = {};
+    }
+    if (typeof session.exerciseWeights[exerciseName] !== 'object') {
+      session.exerciseWeights[exerciseName] = {};
+    }
+    session.exerciseWeights[exerciseName][round] = weight;
+  }
+
+  saveSession();
+}
+
+// Clear all weights (for cancel operation)
+export function clearExerciseWeights() {
+  if (!session) return;
+  session.exerciseWeights = {};
+  saveSession();
+}
+
+// Set all exercise weights at once (for confirm operation)
+export function setAllExerciseWeights(weights) {
+  if (!session) return;
+  session.exerciseWeights = weights;
+  saveSession();
 }
 
 // Check if completing current exercise would end the workout
