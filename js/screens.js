@@ -93,20 +93,16 @@ function renderAdvancedDiceTable(config) {
             <tr data-key="${row.key}">
               <td class="category-cell" data-category="${row.category}">${row.label}</td>
               <td>
-                <input type="number"
-                       class="advanced-die-input"
-                       data-key="${row.key}"
-                       data-type="exerciseDie"
-                       value="${catDice.exerciseDie}"
-                       min="1" max="100">
+                <button class="advanced-die-btn"
+                        data-key="${row.key}"
+                        data-type="exerciseDie"
+                        data-value="${catDice.exerciseDie}">D${catDice.exerciseDie}<span class="die-edit-icon">✎</span></button>
               </td>
               <td>
-                <input type="number"
-                       class="advanced-die-input"
-                       data-key="${row.key}"
-                       data-type="repDie"
-                       value="${catDice.repDie}"
-                       min="1" max="100">
+                <button class="advanced-die-btn"
+                        data-key="${row.key}"
+                        data-type="repDie"
+                        data-value="${catDice.repDie}">D${catDice.repDie}<span class="die-edit-icon">✎</span></button>
               </td>
             </tr>
           `;
@@ -458,30 +454,143 @@ function attachSetupListeners(container) {
     updateHPUI(recommended);
   }
 
-  // Attach listeners to advanced dice inputs
+  // Attach listeners to advanced dice buttons
   function attachAdvancedDiceListeners(container) {
-    container.querySelectorAll('.advanced-die-input').forEach(input => {
-      input.addEventListener('change', () => {
-        const key = input.dataset.key;
-        const type = input.dataset.type;
-        const value = parseInt(input.value) || 6;
+    container.querySelectorAll('.advanced-die-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.key;
+        const type = btn.dataset.type;
+        const currentValue = parseInt(btn.dataset.value);
+        showAdvancedDieModal(container, btn, key, type, currentValue);
+      });
+    });
+  }
 
-        const state = State.getState();
-        const categoryDice = { ...state.sessionConfig.categoryDice };
+  // Show modal to edit die for advanced dice table
+  function showAdvancedDieModal(container, btn, key, type, currentValue) {
+    const label = type === 'exerciseDie' ? 'Exercise' : 'Rep';
 
-        if (!categoryDice[key]) {
-          categoryDice[key] = { exerciseDie: 6, repDie: 6 };
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <h3>${label} Die</h3>
+          <button class="modal-close" title="Close">×</button>
+        </div>
+        <div class="modal-content">
+          <div class="die-selector die-selector--modal">
+            ${DIE_SIZES.map(size => `
+              <div class="die-option">
+                <input type="radio"
+                       id="adv-die-${size}"
+                       name="advDie"
+                       value="${size}"
+                       ${currentValue === size ? 'checked' : ''}>
+                <label for="adv-die-${size}">D${size}</label>
+              </div>
+            `).join('')}
+            <div class="die-option">
+              <input type="radio"
+                     id="adv-die-custom"
+                     name="advDie"
+                     value="custom"
+                     ${!DIE_SIZES.includes(currentValue) ? 'checked' : ''}>
+              <label for="adv-die-custom">D${!DIE_SIZES.includes(currentValue) ? currentValue : '?'}</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(modal);
+
+    // Close button
+    modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+
+    // Click outside to close
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+
+    // Custom die input modal
+    function showCustomAdvDieModal() {
+      const customModal = document.createElement('div');
+      customModal.className = 'modal-overlay';
+      customModal.innerHTML = `
+        <div class="modal">
+          <h2>Custom Die</h2>
+          <div class="modal-input-group">
+            <label>D</label>
+            <input type="number" id="custom-adv-die-input" min="1" max="100" value="${!DIE_SIZES.includes(currentValue) ? currentValue : ''}" placeholder="?">
+          </div>
+          <div class="modal-buttons">
+            <button class="btn btn--full" id="custom-adv-die-confirm">Confirm</button>
+            <button class="btn btn--full btn--secondary" id="custom-adv-die-cancel">Cancel</button>
+          </div>
+        </div>
+      `;
+
+      container.appendChild(customModal);
+
+      const input = customModal.querySelector('#custom-adv-die-input');
+      input.focus();
+      input.select();
+
+      const confirmCustom = () => {
+        const value = parseInt(input.value);
+        if (value && value >= 1) {
+          applyAdvancedDieValue(key, type, value, btn);
+          customModal.remove();
+          modal.remove();
         }
-        categoryDice[key][type] = value;
+      };
 
-        State.updateConfig({ categoryDice });
+      customModal.querySelector('#custom-adv-die-confirm').addEventListener('click', confirmCustom);
+      customModal.querySelector('#custom-adv-die-cancel').addEventListener('click', () => customModal.remove());
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') confirmCustom();
+        if (e.key === 'Escape') customModal.remove();
+      });
+      customModal.addEventListener('click', (e) => {
+        if (e.target === customModal) customModal.remove();
+      });
+    }
 
-        // Update HP recommendation if rep die changed
-        if (type === 'repDie') {
-          updateHPRecommendation();
+    // Die option listeners
+    modal.querySelectorAll('input[name="advDie"]').forEach(input => {
+      input.addEventListener('change', () => {
+        if (input.value === 'custom') {
+          showCustomAdvDieModal();
+        } else {
+          const value = parseInt(input.value);
+          applyAdvancedDieValue(key, type, value, btn);
+          modal.remove();
         }
       });
     });
+  }
+
+  // Apply advanced die value
+  function applyAdvancedDieValue(key, type, value, btn) {
+    const state = State.getState();
+    const categoryDice = { ...state.sessionConfig.categoryDice };
+
+    if (!categoryDice[key]) {
+      categoryDice[key] = { exerciseDie: 6, repDie: 6 };
+    }
+    categoryDice[key][type] = value;
+
+    State.updateConfig({ categoryDice });
+
+    // Update the button
+    btn.dataset.value = value;
+    btn.innerHTML = `D${value}<span class="die-edit-icon">✎</span>`;
+
+    // Update HP recommendation if rep die changed
+    if (type === 'repDie') {
+      updateHPRecommendation();
+    }
   }
 
   // Helper to apply die value with linked sync
@@ -760,7 +869,8 @@ function renderSingleSlot(session, slot, index, isNewRound) {
             `;
             })() : ''}
             ${!isNewRound && hasSubclass && !hasExercise ? (() => {
-              const exerciseDie = getExerciseDieForSlot(session.config, slot.category, slot.subclass);
+              const exerciseDie = getExerciseDieForSlot(session.config, slot.category, slot.subclass, slot);
+              const hasOverride = slot.exerciseDieOverride !== null;
               return `
               <select class="roll-select" data-slot="${index}" data-type="exercise">
                 <option value="">Select...</option>
@@ -769,16 +879,17 @@ function renderSingleSlot(session, slot, index, isNewRound) {
                 `).join('')}
               </select>
               <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
-              <span class="die-indicator">D${exerciseDie}</span>
+              <button class="die-indicator die-indicator--editable ${hasOverride ? 'die-indicator--override' : ''}" data-edit-die="${index}" data-die-type="exercise" title="Edit exercise die">D${exerciseDie}<span class="die-edit-icon">✎</span></button>
             `;
             })() : ''}
             ${hasExercise && !hasReps ? (() => {
-              const repDie = getRepDieForSlot(session.config, slot.category, slot.subclass);
+              const repDie = getRepDieForSlot(session.config, slot.category, slot.subclass, slot);
+              const hasOverride = slot.repDieOverride !== null;
               return `
               <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
                      min="1" max="${repDie}">
               <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
-              <span class="die-indicator">D${repDie}</span>
+              <button class="die-indicator die-indicator--editable ${hasOverride ? 'die-indicator--override' : ''}" data-edit-die="${index}" data-die-type="reps" title="Edit reps die">D${repDie}<span class="die-edit-icon">✎</span></button>
             `;
             })() : ''}
           </div>
@@ -941,20 +1052,22 @@ function renderRevealMode(session) {
             `}
           </div>
           ${hasControls ? (() => {
-            const exerciseDie = getExerciseDieForSlot(session.config, slot.category, slot.subclass);
-            const repDie = getRepDieForSlot(session.config, slot.category, slot.subclass);
+            const exerciseDie = getExerciseDieForSlot(session.config, slot.category, slot.subclass, slot);
+            const repDie = getRepDieForSlot(session.config, slot.category, slot.subclass, slot);
+            const hasExerciseOverride = slot.exerciseDieOverride !== null;
+            const hasRepsOverride = slot.repDieOverride !== null;
             return `
             <div class="roll-controls">
               ${!hasExercise ? `
                 <input type="number" class="roll-input" data-slot="${index}" data-type="exercise"
                        min="1" max="${exerciseDie}">
                 <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
-                <span class="die-indicator">D${exerciseDie}</span>
+                <button class="die-indicator die-indicator--editable ${hasExerciseOverride ? 'die-indicator--override' : ''}" data-edit-die="${index}" data-die-type="exercise" title="Edit exercise die">D${exerciseDie}<span class="die-edit-icon">✎</span></button>
               ` : !hasReps ? `
                 <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
                        min="1" max="${repDie}">
                 <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll</button>
-                <span class="die-indicator">D${repDie}</span>
+                <button class="die-indicator die-indicator--editable ${hasRepsOverride ? 'die-indicator--override' : ''}" data-edit-die="${index}" data-die-type="reps" title="Edit reps die">D${repDie}<span class="die-edit-icon">✎</span></button>
               ` : ''}
             </div>
           `;
@@ -1083,7 +1196,8 @@ function updateRollSlot(container, session, index, isNewRound) {
         <span class="die-indicator">D${validSubclasses.length}</span>
       `;
     } else if (!isNewRound && hasSubclass && !hasExercise) {
-      const exerciseDie = getExerciseDieForSlot(session.config, slot.category, slot.subclass);
+      const exerciseDie = getExerciseDieForSlot(session.config, slot.category, slot.subclass, slot);
+      const hasExerciseOverride = slot.exerciseDieOverride !== null;
       newControls = `
         <select class="roll-select" data-slot="${index}" data-type="exercise">
           <option value="">Select...</option>
@@ -1092,15 +1206,16 @@ function updateRollSlot(container, session, index, isNewRound) {
           `).join('')}
         </select>
         <button class="btn btn--small" data-roll-exercise="${index}">Roll<br>Exercise</button>
-        <span class="die-indicator">D${exerciseDie}</span>
+        <button class="die-indicator die-indicator--editable ${hasExerciseOverride ? 'die-indicator--override' : ''}" data-edit-die="${index}" data-die-type="exercise" title="Edit exercise die">D${exerciseDie}<span class="die-edit-icon">✎</span></button>
       `;
     } else if (hasExercise && !hasReps) {
-      const repDie = getRepDieForSlot(session.config, slot.category, slot.subclass);
+      const repDie = getRepDieForSlot(session.config, slot.category, slot.subclass, slot);
+      const hasRepsOverride = slot.repDieOverride !== null;
       newControls = `
         <input type="number" class="roll-input" data-slot="${index}" data-type="reps"
                min="1" max="${repDie}">
         <button class="btn btn--small btn--secondary" data-roll-reps="${index}">Roll<br>Reps</button>
-        <span class="die-indicator">D${repDie}</span>
+        <button class="die-indicator die-indicator--editable ${hasRepsOverride ? 'die-indicator--override' : ''}" data-edit-die="${index}" data-die-type="reps" title="Edit reps die">D${repDie}<span class="die-edit-icon">✎</span></button>
       `;
     }
 
@@ -1149,6 +1264,151 @@ function attachRerollRepsListener(container, btn, session, isNewRound) {
     State.clearRepsForSlot(index);
     updateRollSlot(container, State.getState().session, index, isNewRound);
     updateEnterButton(container, State.getState().session, isNewRound);
+  });
+}
+
+// Attach die edit button listener
+function attachDieEditListener(container, btn, session, isNewRound) {
+  btn.addEventListener('click', () => {
+    const index = parseInt(btn.dataset.editDie);
+    const dieType = btn.dataset.dieType;
+    showSlotDieEditModal(container, index, dieType, isNewRound);
+  });
+}
+
+// Show modal to edit die for a specific slot
+function showSlotDieEditModal(container, slotIndex, dieType, isNewRound) {
+  const session = State.getState().session;
+  const slot = session.slots[slotIndex];
+  const isExercise = dieType === 'exercise';
+
+  // Get the current effective die value
+  const currentDie = isExercise
+    ? getExerciseDieForSlot(session.config, slot.category, slot.subclass, slot)
+    : getRepDieForSlot(session.config, slot.category, slot.subclass, slot);
+
+  // Get the base die value (without override)
+  const baseDie = isExercise
+    ? getExerciseDieForSlot(session.config, slot.category, slot.subclass, null)
+    : getRepDieForSlot(session.config, slot.category, slot.subclass, null);
+
+  const hasOverride = isExercise ? slot.exerciseDieOverride !== null : slot.repDieOverride !== null;
+  const label = isExercise ? 'Exercise' : 'Reps';
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Edit ${label} Die</h3>
+        <button class="modal-close" title="Close">×</button>
+      </div>
+      <div class="modal-content">
+        <p class="text-muted">Override the ${label.toLowerCase()} die for this slot only.</p>
+        <div class="die-selector die-selector--modal">
+          ${DIE_SIZES.map(size => `
+            <div class="die-option">
+              <input type="radio"
+                     id="slot-die-${size}"
+                     name="slotDie"
+                     value="${size}"
+                     ${currentDie === size ? 'checked' : ''}>
+              <label for="slot-die-${size}">D${size}</label>
+            </div>
+          `).join('')}
+          <div class="die-option">
+            <input type="radio"
+                   id="slot-die-custom"
+                   name="slotDie"
+                   value="custom"
+                   ${!DIE_SIZES.includes(currentDie) ? 'checked' : ''}>
+            <label for="slot-die-custom" id="slot-die-custom-label">D${!DIE_SIZES.includes(currentDie) ? currentDie : '?'}</label>
+          </div>
+        </div>
+        ${hasOverride ? `
+          <button class="btn btn--full btn--secondary" id="reset-die-override">Reset to Default (D${baseDie})</button>
+        ` : ''}
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Custom die input modal
+  function showCustomSlotDieModal() {
+    const customModal = document.createElement('div');
+    customModal.className = 'modal-overlay';
+    customModal.innerHTML = `
+      <div class="modal">
+        <h2>Custom Die</h2>
+        <div class="modal-input-group">
+          <label>D</label>
+          <input type="number" id="custom-slot-die-input" min="1" max="100" value="${!DIE_SIZES.includes(currentDie) ? currentDie : ''}" placeholder="?">
+        </div>
+        <div class="modal-buttons">
+          <button class="btn btn--full" id="custom-slot-die-confirm">Confirm</button>
+          <button class="btn btn--full btn--secondary" id="custom-slot-die-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(customModal);
+
+    const input = customModal.querySelector('#custom-slot-die-input');
+    input.focus();
+    input.select();
+
+    const confirmCustom = () => {
+      const value = parseInt(input.value);
+      if (value && value >= 1) {
+        State.setDieOverrideForSlot(slotIndex, dieType, value);
+        customModal.remove();
+        modal.remove();
+        updateRollSlot(container, State.getState().session, slotIndex, isNewRound);
+      }
+    };
+
+    customModal.querySelector('#custom-slot-die-confirm').addEventListener('click', confirmCustom);
+    customModal.querySelector('#custom-slot-die-cancel').addEventListener('click', () => customModal.remove());
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') confirmCustom();
+      if (e.key === 'Escape') customModal.remove();
+    });
+    customModal.addEventListener('click', (e) => {
+      if (e.target === customModal) customModal.remove();
+    });
+  }
+
+  // Close button
+  modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+
+  // Click outside to close
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+
+  // Reset button
+  const resetBtn = modal.querySelector('#reset-die-override');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      State.setDieOverrideForSlot(slotIndex, dieType, null);
+      modal.remove();
+      updateRollSlot(container, State.getState().session, slotIndex, isNewRound);
+    });
+  }
+
+  // Die option listeners
+  modal.querySelectorAll('input[name="slotDie"]').forEach(input => {
+    input.addEventListener('change', () => {
+      if (input.value === 'custom') {
+        showCustomSlotDieModal();
+      } else {
+        const value = parseInt(input.value);
+        State.setDieOverrideForSlot(slotIndex, dieType, value);
+        modal.remove();
+        updateRollSlot(container, State.getState().session, slotIndex, isNewRound);
+      }
+    });
   });
 }
 
@@ -1255,7 +1515,7 @@ function attachSlotListeners(container, controlsEl, session, isNewRound) {
       if (repsInput.value) {
         const slotIndex = parseInt(repsInput.dataset.slot);
         const slot = State.getState().session.slots[slotIndex];
-        const repDie = getRepDieForSlot(State.getState().session.config, slot.category, slot.subclass);
+        const repDie = getRepDieForSlot(State.getState().session.config, slot.category, slot.subclass, slot);
         repsBtn.classList.add('btn--has-input');
         repsBtn.innerHTML = `Confirm Roll<br><span class="btn-formula">Reps = ${repDie} + ${repsInput.value}</span>`;
       } else {
@@ -1264,6 +1524,11 @@ function attachSlotListeners(container, controlsEl, session, isNewRound) {
       }
     });
   }
+
+  // Die edit buttons
+  controlsEl.querySelectorAll('[data-edit-die]').forEach(btn => {
+    attachDieEditListener(container, btn, session, isNewRound);
+  });
 }
 
 function attachRollListeners(container, session, isNewRound) {
@@ -1812,7 +2077,7 @@ export function renderVictoryScreen(container) {
 
       <div class="screen-footer">
         <button class="btn btn--secondary btn--full" id="download-summary">View Summary Image</button>
-        <button class="btn btn--secondary btn--full" id="add-weights">Add Weights</button>
+        <button class="btn btn--neutral btn--full" id="add-weights">Add Weights</button>
         <button class="btn btn--full" id="new-workout">New Workout</button>
       </div>
     </div>

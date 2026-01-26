@@ -6,6 +6,82 @@ import * as Screens from './screens.js';
 const app = document.getElementById('app');
 let timerRAF = null;
 let lastScreen = null;
+let swRegistration = null;
+
+// Service Worker Registration
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) {
+    return;
+  }
+
+  navigator.serviceWorker.register('/sw.js').then((registration) => {
+    swRegistration = registration;
+
+    // Check for updates on page load
+    registration.update();
+
+    // Listen for new service worker installing
+    registration.addEventListener('updatefound', () => {
+      const newWorker = registration.installing;
+      if (!newWorker) return;
+
+      newWorker.addEventListener('statechange', () => {
+        // New service worker is installed and waiting
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdateNotification();
+        }
+      });
+    });
+
+    // If there's already a waiting worker, show notification
+    if (registration.waiting) {
+      showUpdateNotification();
+    }
+  }).catch((error) => {
+    console.error('Service worker registration failed:', error);
+  });
+
+  // Handle controller change (new SW took over)
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+
+// Show update notification toast
+function showUpdateNotification() {
+  // Don't show if already showing
+  if (document.querySelector('.update-toast')) {
+    return;
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'update-toast';
+  toast.innerHTML = `
+    <span class="update-toast-text">A new version is available</span>
+    <button class="update-toast-btn" type="button">Update</button>
+    <button class="update-toast-dismiss" type="button" aria-label="Dismiss">&times;</button>
+  `;
+
+  document.body.appendChild(toast);
+
+  // Trigger animation
+  requestAnimationFrame(() => {
+    toast.classList.add('update-toast-visible');
+  });
+
+  // Update button - activate new service worker
+  toast.querySelector('.update-toast-btn').addEventListener('click', () => {
+    if (swRegistration && swRegistration.waiting) {
+      swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+  });
+
+  // Dismiss button
+  toast.querySelector('.update-toast-dismiss').addEventListener('click', () => {
+    toast.classList.remove('update-toast-visible');
+    setTimeout(() => toast.remove(), 300);
+  });
+}
 
 // Main render function - only re-renders when screen changes
 function render(state) {
@@ -124,6 +200,9 @@ function checkSavedSession() {
 
 // Initialize the app
 function init() {
+  // Register service worker for caching and updates
+  registerServiceWorker();
+
   // Subscribe to state changes (screen changes only trigger re-render)
   State.subscribe(render);
 

@@ -192,7 +192,9 @@ export function createSlots(config, templateOverride = null) {
         exerciseName: null,
         repRoll: null,
         actualReps: null,
-        completed: false
+        completed: false,
+        exerciseDieOverride: null,
+        repDieOverride: null
       });
     }
   }
@@ -251,8 +253,13 @@ function getCategoryDiceKey(config, category, subclass) {
   return category;
 }
 
-// Get exercise die for a slot (respects advanced mode)
-export function getExerciseDieForSlot(config, category, subclass = null) {
+// Get exercise die for a slot (respects slot override, then advanced mode)
+export function getExerciseDieForSlot(config, category, subclass = null, slot = null) {
+  // Check slot override first
+  if (slot && slot.exerciseDieOverride !== null) {
+    return slot.exerciseDieOverride;
+  }
+
   if (!config.advancedDiceMode) return config.exerciseDie;
 
   const key = getCategoryDiceKey(config, category, subclass);
@@ -266,8 +273,13 @@ export function getExerciseDieForSlot(config, category, subclass = null) {
   return config.exerciseDie;
 }
 
-// Get rep die for a slot (respects advanced mode)
-export function getRepDieForSlot(config, category, subclass = null) {
+// Get rep die for a slot (respects slot override, then advanced mode)
+export function getRepDieForSlot(config, category, subclass = null, slot = null) {
+  // Check slot override first
+  if (slot && slot.repDieOverride !== null) {
+    return slot.repDieOverride;
+  }
+
   if (!config.advancedDiceMode) return config.repDie;
 
   const key = getCategoryDiceKey(config, category, subclass);
@@ -727,6 +739,20 @@ export function clearRepsForSlot(slotIndex) {
   // Also clear from baseRepRolls if in fixed mode
   if (session.baseRepRolls[slotIndex] !== undefined) {
     delete session.baseRepRolls[slotIndex];
+  }
+
+  saveSession();
+}
+
+// Set die override for a slot (no notify - caller handles re-render)
+export function setDieOverrideForSlot(slotIndex, dieType, value) {
+  if (!session || !session.slots[slotIndex]) return;
+
+  const slot = session.slots[slotIndex];
+  if (dieType === 'exercise') {
+    slot.exerciseDieOverride = value;
+  } else if (dieType === 'reps') {
+    slot.repDieOverride = value;
   }
 
   saveSession();
