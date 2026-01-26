@@ -157,8 +157,11 @@ function checkWorkoutLink() {
 
     // Try to initialize session from the workout link
     if (State.initSessionFromWorkoutLink(workoutParam)) {
-      // Successfully loaded - go to roll screen
+      // Successfully loaded - render roll screen
+      // Render first, then update lastScreen to prevent duplicate render from setScreen
+      renderScreen('roll');
       lastScreen = 'roll';
+      // Update state's currentScreen (this won't re-render since lastScreen matches)
       State.setScreen('roll');
       return true;
     }
