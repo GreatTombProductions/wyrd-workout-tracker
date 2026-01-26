@@ -2080,7 +2080,7 @@ export function renderVictoryScreen(container) {
       <div class="screen-footer">
         <button class="btn btn--secondary btn--full" id="download-summary">View Summary Image</button>
         <button class="btn btn--neutral btn--full" id="add-weights">Add Weights</button>
-        <button class="btn btn--neutral btn--full" id="copy-workout-link">Copy Encounter Dice Rolls Link</button>
+        <button class="btn btn--neutral btn--full" id="copy-workout-link">Copy Dice Rolls URL</button>
         <button class="btn btn--full" id="new-workout">New Workout</button>
       </div>
     </div>
@@ -2107,14 +2107,14 @@ export function renderVictoryScreen(container) {
       const workoutUrl = State.generateWorkoutUrl();
       if (!workoutUrl) {
         copyLinkBtn.textContent = 'Link unavailable';
-        setTimeout(() => { copyLinkBtn.textContent = 'Copy Encounter Dice Rolls Link'; }, 2000);
+        setTimeout(() => { copyLinkBtn.textContent = 'Copy Dice Rolls URL'; }, 2000);
         return;
       }
 
       try {
         await navigator.clipboard.writeText(workoutUrl);
         copyLinkBtn.textContent = 'Copied!';
-        setTimeout(() => { copyLinkBtn.textContent = 'Copy Encounter Dice Rolls Link'; }, 2000);
+        setTimeout(() => { copyLinkBtn.textContent = 'Copy Dice Rolls URL'; }, 2000);
       } catch (err) {
         // Fallback for browsers without clipboard API
         const textArea = document.createElement('textarea');
@@ -2130,7 +2130,7 @@ export function renderVictoryScreen(container) {
           copyLinkBtn.textContent = 'Copy failed';
         }
         document.body.removeChild(textArea);
-        setTimeout(() => { copyLinkBtn.textContent = 'Copy Encounter Dice Rolls Link'; }, 2000);
+        setTimeout(() => { copyLinkBtn.textContent = 'Copy Dice Rolls URL'; }, 2000);
       }
     });
   }
