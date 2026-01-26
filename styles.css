@@ -1600,7 +1600,7 @@ button.die-indicator--editable:active {
 .die-edit-icon {
   position: absolute;
   right: 2px;
-  top: auto;
+  top: 2px;
   font-size: 0.5rem;
   opacity: 0.6;
 }
