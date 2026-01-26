@@ -1205,7 +1205,7 @@ input[type="text"]:focus {
   }
 
   .die-indicator {
-    width: 36px;
+    width: 42px;
     height: 36px;
   }
 }
@@ -1570,8 +1570,8 @@ input[type="text"]:focus {
   border-radius: 4px;
   padding: 0;
   flex-shrink: 0;
-  /* Square button matching touch target */
-  width: var(--touch-min);
+  /* Slightly wider than tall */
+  width: 52px;
   height: var(--touch-min);
   display: inline-flex;
   align-items: center;
