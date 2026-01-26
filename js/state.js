@@ -882,3 +882,176 @@ export function getAvailableCategoriesForSession() {
 
   return Array.from(allCategories);
 }
+
+// ========== Workout Link Encoding/Decoding ==========
+
+// Capture the current roll state for workout link generation
+export function captureWorkoutLinkData() {
+  if (!session) return;
+
+  // Store a compact snapshot of the roll state
+  session.workoutLinkData = encodeWorkoutState(session);
+  saveSession();
+}
+
+// Get the stored workout link data
+export function getWorkoutLinkData() {
+  return session?.workoutLinkData || null;
+}
+
+// Encode workout state to a compact URL-safe string
+export function encodeWorkoutState(sess) {
+  const data = {
+    // Config (compact keys)
+    c: {
+      s: sess.config.subclasses,
+      m: sess.config.multiclass ? 1 : 0,
+      e: sess.config.exerciseDie,
+      r: sess.config.repDie,
+      h: sess.config.hpThreshold,
+      rm: sess.config.repMode === 'per-round' ? 1 : 0,
+      a: sess.config.advancedDiceMode ? 1 : 0
+    },
+    // Slots (compact)
+    sl: sess.slots.map(slot => {
+      const s = {
+        c: slot.category,
+        sc: slot.subclass,
+        ei: slot.exerciseIndex,
+        rr: slot.repRoll,
+        ar: slot.actualReps
+      };
+      // Only include overrides if set
+      if (slot.exerciseDieOverride !== null) s.eo = slot.exerciseDieOverride;
+      if (slot.repDieOverride !== null) s.ro = slot.repDieOverride;
+      return s;
+    })
+  };
+
+  // Include categoryDice only if advanced mode
+  if (sess.config.advancedDiceMode && Object.keys(sess.config.categoryDice).length > 0) {
+    data.c.cd = sess.config.categoryDice;
+  }
+
+  // Encode to base64 URL-safe string
+  const json = JSON.stringify(data);
+  return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// Decode workout state from URL parameter
+export function decodeWorkoutState(encoded) {
+  try {
+    // Restore base64 padding and characters
+    let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+
+    const json = atob(base64);
+    const data = JSON.parse(json);
+
+    // Reconstruct full config
+    const config = {
+      subclasses: data.c.s,
+      multiclass: data.c.m === 1,
+      exerciseDie: data.c.e,
+      repDie: data.c.r,
+      diceLocked: false,
+      hpThreshold: data.c.h,
+      repMode: data.c.rm === 1 ? 'per-round' : 'fixed',
+      advancedDiceMode: data.c.a === 1,
+      categoryDice: data.c.cd || {},
+      roundTemplate: null // Will be derived from slots
+    };
+
+    // Reconstruct slots
+    const slots = data.sl.map(s => ({
+      category: s.c,
+      subclass: s.sc,
+      exerciseIndex: s.ei,
+      exerciseName: null, // Will be derived
+      repRoll: s.rr,
+      actualReps: s.ar,
+      completed: false,
+      exerciseDieOverride: s.eo || null,
+      repDieOverride: s.ro || null
+    }));
+
+    return { config, slots };
+  } catch (e) {
+    console.error('Failed to decode workout state:', e);
+    return null;
+  }
+}
+
+// Generate the full workout URL
+export function generateWorkoutUrl() {
+  const linkData = getWorkoutLinkData();
+  if (!linkData) return null;
+
+  const baseUrl = window.location.origin + window.location.pathname;
+  return `${baseUrl}?w=${linkData}`;
+}
+
+// Initialize session from URL-encoded workout state
+export function initSessionFromWorkoutLink(encoded) {
+  const decoded = decodeWorkoutState(encoded);
+  if (!decoded) return false;
+
+  const { config, slots } = decoded;
+
+  // Derive exercise names from subclass data
+  slots.forEach(slot => {
+    if (slot.subclass && slot.exerciseIndex !== null) {
+      const subclassData = SUBCLASSES[slot.subclass];
+      if (subclassData && subclassData.exercises[slot.category]) {
+        const exercises = subclassData.exercises[slot.category];
+        const idx = Math.min(slot.exerciseIndex, exercises.length) - 1;
+        slot.exerciseName = exercises[idx] || null;
+      }
+    }
+  });
+
+  // Build round template from slots
+  const templateMap = {};
+  slots.forEach(slot => {
+    templateMap[slot.category] = (templateMap[slot.category] || 0) + 1;
+  });
+  config.roundTemplate = Object.entries(templateMap).map(([category, count]) => ({
+    category,
+    count
+  }));
+
+  // Update session config (for setup screen if they navigate back)
+  sessionConfig = { ...DEFAULT_SESSION_CONFIG, ...config };
+
+  // Create session with the pre-rolled slots
+  session = {
+    config: { ...config },
+    slots,
+    currentSlotIndex: 0,
+    currentRound: 1,
+    hpRemaining: config.hpThreshold,
+    timer: {
+      elapsed: 0,
+      running: false,
+      lastTick: null
+    },
+    baseRepRolls: {},
+    totalRepsCompleted: 0,
+    exerciseHistory: []
+  };
+
+  // Store base rep rolls for fixed mode
+  if (config.repMode === 'fixed') {
+    slots.forEach((slot, index) => {
+      if (slot.repRoll !== null) {
+        session.baseRepRolls[index] = slot.repRoll;
+      }
+    });
+  }
+
+  // Capture the link data immediately so it can be re-shared
+  session.workoutLinkData = encoded;
+
+  saveSession();
+  return true;
+}

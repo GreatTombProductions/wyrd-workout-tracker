@@ -145,8 +145,35 @@ function startPeriodicSave() {
   }, 5000);
 }
 
+// Check for workout link in URL parameters
+function checkWorkoutLink() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const workoutParam = urlParams.get('w');
+
+  if (workoutParam) {
+    // Clear the URL parameter without triggering navigation
+    const cleanUrl = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+
+    // Try to initialize session from the workout link
+    if (State.initSessionFromWorkoutLink(workoutParam)) {
+      // Successfully loaded - go to roll screen
+      lastScreen = 'roll';
+      State.setScreen('roll');
+      return true;
+    }
+  }
+
+  return false;
+}
+
 // Check for saved session on load
 function checkSavedSession() {
+  // First check for workout link in URL
+  if (checkWorkoutLink()) {
+    return;
+  }
+
   if (State.hasSavedSession()) {
     const loaded = State.loadSession();
     if (loaded) {

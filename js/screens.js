@@ -1571,6 +1571,8 @@ function attachRollListeners(container, session, isNewRound) {
   const enterBtn = container.querySelector('#enter-workout');
   if (enterBtn) {
     enterBtn.addEventListener('click', () => {
+      // Capture the roll state for workout link before starting
+      State.captureWorkoutLinkData();
       State.startTimer();
       State.setScreen('workout');
     });
@@ -2078,6 +2080,7 @@ export function renderVictoryScreen(container) {
       <div class="screen-footer">
         <button class="btn btn--secondary btn--full" id="download-summary">View Summary Image</button>
         <button class="btn btn--neutral btn--full" id="add-weights">Add Weights</button>
+        <button class="btn btn--neutral btn--full" id="copy-workout-link">Copy Workout Link</button>
         <button class="btn btn--full" id="new-workout">New Workout</button>
       </div>
     </div>
@@ -2095,6 +2098,40 @@ export function renderVictoryScreen(container) {
   if (addWeightsBtn) {
     addWeightsBtn.addEventListener('click', () => {
       renderWeightEditScreen(container, stats, uniqueExercises, totalRounds);
+    });
+  }
+
+  const copyLinkBtn = container.querySelector('#copy-workout-link');
+  if (copyLinkBtn) {
+    copyLinkBtn.addEventListener('click', async () => {
+      const workoutUrl = State.generateWorkoutUrl();
+      if (!workoutUrl) {
+        copyLinkBtn.textContent = 'Link unavailable';
+        setTimeout(() => { copyLinkBtn.textContent = 'Copy Workout Link'; }, 2000);
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(workoutUrl);
+        copyLinkBtn.textContent = 'Copied!';
+        setTimeout(() => { copyLinkBtn.textContent = 'Copy Workout Link'; }, 2000);
+      } catch (err) {
+        // Fallback for browsers without clipboard API
+        const textArea = document.createElement('textarea');
+        textArea.value = workoutUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          copyLinkBtn.textContent = 'Copied!';
+        } catch (e) {
+          copyLinkBtn.textContent = 'Copy failed';
+        }
+        document.body.removeChild(textArea);
+        setTimeout(() => { copyLinkBtn.textContent = 'Copy Workout Link'; }, 2000);
+      }
     });
   }
 
