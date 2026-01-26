@@ -1,8 +1,10 @@
 // Wyrd Workout - Main Application
+console.log('[App] Loading app.js...');
 
 import * as State from './state.js';
 import * as Screens from './screens.js';
 
+console.log('[App] Imports complete');
 const app = document.getElementById('app');
 let timerRAF = null;
 let lastScreen = null;
@@ -149,6 +151,7 @@ function startPeriodicSave() {
 function checkWorkoutLink() {
   const urlParams = new URLSearchParams(window.location.search);
   const workoutParam = urlParams.get('w');
+  console.log('[WorkoutLink] Checking URL params, w=', workoutParam ? workoutParam.substring(0, 20) + '...' : null);
 
   if (workoutParam) {
     // Clear the URL parameter without triggering navigation
@@ -156,14 +159,21 @@ function checkWorkoutLink() {
     window.history.replaceState({}, '', cleanUrl);
 
     // Try to initialize session from the workout link
-    if (State.initSessionFromWorkoutLink(workoutParam)) {
-      // Successfully loaded - render roll screen
-      // Render first, then update lastScreen to prevent duplicate render from setScreen
-      renderScreen('roll');
-      lastScreen = 'roll';
-      // Update state's currentScreen (this won't re-render since lastScreen matches)
-      State.setScreen('roll');
-      return true;
+    console.log('[WorkoutLink] Attempting to init session from link...');
+    try {
+      const result = State.initSessionFromWorkoutLink(workoutParam);
+      console.log('[WorkoutLink] initSessionFromWorkoutLink result:', result);
+      if (result) {
+        // Successfully loaded - render roll screen
+        console.log('[WorkoutLink] Rendering roll screen...');
+        renderScreen('roll');
+        lastScreen = 'roll';
+        State.setScreen('roll');
+        console.log('[WorkoutLink] Done, state:', State.getState());
+        return true;
+      }
+    } catch (e) {
+      console.error('[WorkoutLink] Error initializing from link:', e);
     }
   }
 
@@ -230,6 +240,7 @@ function checkSavedSession() {
 
 // Initialize the app
 function init() {
+  console.log('[App] init() called');
   // Register service worker for caching and updates
   registerServiceWorker();
 

@@ -940,13 +940,16 @@ export function encodeWorkoutState(sess) {
 
 // Decode workout state from URL parameter
 export function decodeWorkoutState(encoded) {
+  console.log('[decodeWorkoutState] Starting decode...');
   try {
     // Restore base64 padding and characters
     let base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
     while (base64.length % 4) base64 += '=';
 
     const json = atob(base64);
+    console.log('[decodeWorkoutState] Decoded JSON:', json.substring(0, 100) + '...');
     const data = JSON.parse(json);
+    console.log('[decodeWorkoutState] Parsed data:', data);
 
     // Reconstruct full config
     const config = {
@@ -975,9 +978,10 @@ export function decodeWorkoutState(encoded) {
       repDieOverride: s.ro || null
     }));
 
+    console.log('[decodeWorkoutState] Success, config:', config, 'slots:', slots.length);
     return { config, slots };
   } catch (e) {
-    console.error('Failed to decode workout state:', e);
+    console.error('[decodeWorkoutState] Failed to decode workout state:', e);
     return null;
   }
 }
@@ -993,10 +997,15 @@ export function generateWorkoutUrl() {
 
 // Initialize session from URL-encoded workout state
 export function initSessionFromWorkoutLink(encoded) {
+  console.log('[initSessionFromWorkoutLink] Starting...');
   const decoded = decodeWorkoutState(encoded);
-  if (!decoded) return false;
+  if (!decoded) {
+    console.error('[initSessionFromWorkoutLink] Decode failed');
+    return false;
+  }
 
   const { config, slots } = decoded;
+  console.log('[initSessionFromWorkoutLink] Decoded successfully, setting up session...');
 
   // Derive exercise names from subclass data
   slots.forEach(slot => {
@@ -1053,5 +1062,6 @@ export function initSessionFromWorkoutLink(encoded) {
   session.workoutLinkData = encoded;
 
   saveSession();
+  console.log('[initSessionFromWorkoutLink] Session created successfully:', session);
   return true;
 }
