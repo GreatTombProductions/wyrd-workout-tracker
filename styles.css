@@ -124,6 +124,20 @@ h1 {
   white-space: nowrap;
 }
 
+.title-header .acknowledgement {
+  font-size: clamp(0.65rem, 2.5vw, 0.85rem);
+  margin-top: var(--spacing-sm);
+  margin-bottom: 0;
+  white-space: normal;
+  color: var(--text-secondary);
+  font-family: 'Crimson Text', Georgia, serif;
+}
+
+.title-header .acknowledgement a {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
 h2 {
   font-size: 1.25rem;
   margin-bottom: var(--spacing-md);

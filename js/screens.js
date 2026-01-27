@@ -125,6 +125,7 @@ export function renderSetupScreen(container) {
       <header class="title-header">
         <h1>Wyrd of the World Tree</h1>
         <h2 class="subtitle">Workout Tracker</h2>
+        <p class="acknowledgement">This is an unofficial community tool for <a href="https://tankstraininggrounds.com/wyrdoftheworldtree" target="_blank" rel="noopener">Tank Tolman's Wyrd of the World Tree</a> FitRPG Campaign</p>
       </header>
 
       <div class="screen-content">
