@@ -1,6 +1,6 @@
 // Wyrd Workout Service Worker
 // Increment this version when deploying updates
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 const CACHE_NAME = `wyrd-workout-v${CACHE_VERSION}`;
 
 // Assets to cache on install
