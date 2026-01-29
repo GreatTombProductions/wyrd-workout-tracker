@@ -979,6 +979,63 @@ input[type="text"]:focus {
   letter-spacing: 0.05em;
 }
 
+/* Editable time stat */
+.victory-stat--editable .edit-icon {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  font-size: 0.65rem;
+  margin-left: 0.25em;
+}
+
+.victory-stat--editable .edit-icon:hover {
+  opacity: 1;
+}
+
+.victory-stat--editable .edit-icon--confirm {
+  color: var(--accent-green-light);
+  opacity: 1;
+}
+
+.victory-stat-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.time-input {
+  width: 2.5rem;
+  padding: 0.25rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: center;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--accent-burgundy-light);
+  -moz-appearance: textfield;
+}
+
+.time-input::-webkit-outer-spin-button,
+.time-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.time-input:focus {
+  outline: none;
+  border-color: var(--accent-burgundy);
+}
+
+.time-separator {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-burgundy-light);
+}
+
 .victory-history {
   display: flex;
   flex-direction: column;

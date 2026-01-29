@@ -2040,9 +2040,14 @@ export function renderVictoryScreen(container) {
 
         <div class="screen-content">
           <div class="victory-stats">
-            <div class="victory-stat">
-              <div class="victory-stat-value">${stats.totalTime}</div>
-              <div class="victory-stat-label">Time</div>
+            <div class="victory-stat victory-stat--editable" id="time-stat">
+              <div class="victory-stat-value" id="time-display">${stats.totalTime}</div>
+              <div class="victory-stat-edit hidden" id="time-edit">
+                <input type="number" id="time-minutes" min="0" max="999" class="time-input" />
+                <span class="time-separator">:</span>
+                <input type="number" id="time-seconds" min="0" max="59" class="time-input" />
+              </div>
+              <div class="victory-stat-label">Time <span class="edit-icon" id="edit-time-btn">✎</span></div>
             </div>
             <div class="victory-stat">
               <div class="victory-stat-value">${stats.totalRounds}</div>
@@ -2092,6 +2097,75 @@ export function renderVictoryScreen(container) {
     newBtn.addEventListener('click', () => {
       State.clearSession();
       State.setScreen('setup');
+    });
+  }
+
+  // Time editing functionality
+  const editTimeBtn = container.querySelector('#edit-time-btn');
+  const timeDisplay = container.querySelector('#time-display');
+  const timeEdit = container.querySelector('#time-edit');
+  const minutesInput = container.querySelector('#time-minutes');
+  const secondsInput = container.querySelector('#time-seconds');
+
+  if (editTimeBtn && timeDisplay && timeEdit && minutesInput && secondsInput) {
+    let isEditing = false;
+
+    // Parse current time
+    const [currentMin, currentSec] = stats.totalTime.split(':').map(Number);
+
+    editTimeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!isEditing) {
+        // Enter edit mode
+        isEditing = true;
+        minutesInput.value = currentMin;
+        secondsInput.value = currentSec;
+        timeDisplay.classList.add('hidden');
+        timeEdit.classList.remove('hidden');
+        editTimeBtn.textContent = '✓';
+        editTimeBtn.classList.add('edit-icon--confirm');
+        minutesInput.focus();
+        minutesInput.select();
+      } else {
+        // Save and exit edit mode
+        const newMin = Math.max(0, parseInt(minutesInput.value) || 0);
+        const newSec = Math.max(0, Math.min(59, parseInt(secondsInput.value) || 0));
+        State.setTimerElapsed(newMin, newSec);
+
+        // Update display
+        const formatted = `${newMin.toString().padStart(2, '0')}:${newSec.toString().padStart(2, '0')}`;
+        timeDisplay.textContent = formatted;
+        stats.totalTime = formatted;
+
+        isEditing = false;
+        timeDisplay.classList.remove('hidden');
+        timeEdit.classList.add('hidden');
+        editTimeBtn.textContent = '✎';
+        editTimeBtn.classList.remove('edit-icon--confirm');
+      }
+    });
+
+    // Handle Enter key in inputs
+    [minutesInput, secondsInput].forEach(input => {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          editTimeBtn.click();
+        } else if (e.key === 'Escape') {
+          isEditing = false;
+          timeDisplay.classList.remove('hidden');
+          timeEdit.classList.add('hidden');
+          editTimeBtn.textContent = '✎';
+          editTimeBtn.classList.remove('edit-icon--confirm');
+        }
+      });
+    });
+
+    // Auto-advance from minutes to seconds
+    minutesInput.addEventListener('input', () => {
+      if (minutesInput.value.length >= 2) {
+        secondsInput.focus();
+        secondsInput.select();
+      }
     });
   }
 

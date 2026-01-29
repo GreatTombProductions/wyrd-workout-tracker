@@ -593,6 +593,13 @@ export function getFormattedTime() {
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
+// Set timer elapsed time directly (for manual editing)
+export function setTimerElapsed(minutes, seconds) {
+  if (!session) return;
+  session.timer.elapsed = (minutes * 60 + seconds) * 1000;
+  saveSession();
+}
+
 // Get current exercise slot
 export function getCurrentSlot() {
   if (!session) return null;
