@@ -997,6 +997,11 @@ input[type="text"]:focus {
   opacity: 1;
 }
 
+/* Hide edit icon during screenshot capture */
+.capturing .edit-icon {
+  display: none;
+}
+
 .victory-stat-edit {
   display: flex;
   align-items: center;

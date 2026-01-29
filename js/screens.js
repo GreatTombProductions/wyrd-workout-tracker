@@ -2219,6 +2219,9 @@ export function renderVictoryScreen(container) {
       downloadBtn.disabled = true;
       downloadBtn.textContent = 'Generating...';
 
+      // Hide edit icons during capture
+      captureElement.classList.add('capturing');
+
       try {
         const canvas = await html2canvas(captureElement, {
           backgroundColor: '#2a2520',
@@ -2238,6 +2241,7 @@ export function renderVictoryScreen(container) {
       } catch (err) {
         console.error('Failed to generate image:', err);
       } finally {
+        captureElement.classList.remove('capturing');
         downloadBtn.disabled = false;
         downloadBtn.textContent = 'View Summary Image';
       }
