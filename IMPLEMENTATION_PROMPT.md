@@ -1,3 +1,5 @@
+**Status: IMPLEMENTED** — Retained as design record.
+
 **Implementation Prompt: Wyrd Workout Tracker**
 
 ---
