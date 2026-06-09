@@ -45,7 +45,7 @@ python3 -m http.server 8000 --bind 0.0.0.0
 
 ## Current State
 
-**Status:** Maintenance mode - 12-week campaign runs through mid-April 2026
+**Status:** Maintenance mode — stable, functional. Last 12-week campaign concluded mid-April 2026.
 
 **Last Activity:** January 25, 2026
 - 953c483 Change button text
@@ -138,8 +138,8 @@ Exercises organized by pattern:
 
 ## Notes
 
-**Current Campaign:**
-12-week campaign runs through mid-April 2026. Community tool—users track their own progress.
+**Campaign Status:**
+Last 12-week campaign concluded mid-April 2026. Community tool — users track their own progress via localStorage.
 
 **Data Collection Status:**
 - 6 classes fully documented with screenshots
@@ -174,4 +174,4 @@ Part of Ray's fitness content ecosystem. Complements:
 
 ---
 
-*Community tool for 12-week campaign runs. Maintenance mode—stable, functional, occasional UI tweaks. Mid-April 2026 campaign completion target.*
+*Community tool for gamified workout tracking. Maintenance mode — stable, functional, occasional UI tweaks.*
