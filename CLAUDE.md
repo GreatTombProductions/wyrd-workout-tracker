@@ -30,7 +30,7 @@ Single-page web app ("Worldtree Workout") that gamifies strength training using 
 ## How to Run Locally
 
 ```bash
-cd /home/ray/greattomb/community-tools/wyrd-workouts
+cd /home/ray/greattomb/0th-floor-exterior/east-mausoleum/wyrd-workouts
 # Open index.html in browser, or:
 python3 -m http.server 8000
 # Visit http://localhost:8000
